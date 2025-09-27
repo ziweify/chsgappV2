@@ -1,0 +1,203 @@
+{
+  "pages": [
+    {
+      "path": "pages/common/login",
+      "style": {"navigationBarTitleText": "会员登录","enablePullDownRefresh": false,"disableScroll": true}
+    },{
+      "path": "pages/common/register",
+      "style": {"navigationBarTitleText": "会员注册","enablePullDownRefresh": false,"disableScroll": true}
+    },{
+    "path": "pages/home/home",
+    "style": {"navigationBarTitleText": "首页","enablePullDownRefresh": false,"disableScroll": true}
+  },{
+    "path": "pages/member/personamessage",
+    "style": {"navigationBarTitleText": "个人设置","enablePullDownRefresh": false,"disableScroll": true}
+  },{
+    "path"
+    : "pages/member/personalicon",
+    "style": {"navigationBarTitleText": "修改昵称","enablePullDownRefresh": false,"disableScroll": true}
+  },{
+    "path": "pages/member/personalportrait",
+    "style": {"navigationBarTitleText": "修改头像","enablePullDownRefresh": false,"disableScroll": true}
+  },{
+    "path": "pages/common/modifypwd",
+    "style": {"navigationBarTitleText": "修改密码","disableScroll": true}
+  },{
+    "path": "pages/common/setFirstPassword",
+    "style": {"navigationBarTitleText": "设置初始密码","disableScroll": true}
+  },{
+    "path": "pages/auth",
+    "style": {"navigationBarTitleText": "授权页面","enablePullDownRefresh": false}
+  },{
+    "path": "pages/gamehall/gamehall",
+    "style": {"navigationBarTitleText": "游戏大厅","enablePullDownRefresh": false}
+  },{
+      "path": "copage/chat",
+      "style": {
+        "navigationBarTitleText": "聊天室",
+        "enablePullDownRefresh": false
+        /* #ifdef APP-NVUE */
+        ,"disableScroll": true
+        /* #endif */
+      }
+    },{
+    "path": "copage/custChat",
+    "style": {"navigationBarTitleText": "在线客服","enablePullDownRefresh": false}
+  },{
+    "path": "copage/kjresult",
+    "style": {"navigationBarTitleText": "开奖结果","enablePullDownRefresh": false}
+  },{
+    "path": "pages/wallet/wallet",
+    "style": {"navigationBarTitleText": "钱包中心","enablePullDownRefresh": false,"disableScroll": true}
+  },{
+      "path": "pages/wallet/walletApply",
+      "style": {"navigationBarTitleText": "个人申请"}
+    },{
+      "path": "pages/wallet/report",
+      "style": {"navigationBarTitleText": "两周报表"}
+    },{
+      "path": "pages/wallet/betrecord",
+      "style": {"navigationBarTitleText": "下注记录"}
+    },{
+      "path": "pages/wallet/wjsBetrecord",
+      "style": {"navigationBarTitleText": "未结记录"}
+    },{
+      "path": "pages/wallet/moneyLog",
+      "style": {"navigationBarTitleText": "积分账变"}
+    },{
+      "path": "pages/gameintroduce/gameintroduce",
+      "style": {"navigationBarTitleText": "房间介绍"}
+    },{
+      "path": "pages/personal/personal",
+      "style": {"navigationBarTitleText": "个人中心"}
+    }
+  ,{
+      "path": "agent/login/login",
+      "style": {"navigationBarTitleText": "房主登陆","enablePullDownRefresh": false,"disableScroll": true}
+    },{
+      "path": "agent/gamehall/hall",
+      "style": {"navigationBarTitleText": "游戏大厅","enablePullDownRefresh": false}
+    },{
+      "path": "agent/nearchat/nearchat",
+      "style": {"navigationBarTitleText": "最近聊天","enablePullDownRefresh": false}
+    },{
+      "path": "agent/common/modifypwd",
+      "style": {"navigationBarTitleText": "修改密码","disableScroll": true}
+    },{
+      "path": "agent/gamedata/gamedata",
+      "style": {"navigationBarTitleText": "游戏数据","enablePullDownRefresh": false}
+    },{
+      "path": "agent/gamedata/betdata",
+      "style": {"navigationBarTitleText": "下注数据"}
+    },{
+      "path": "agent/gamedata/betdataRecord",
+      "style": {"navigationBarTitleText": "游戏记录"}
+    },{
+      "path": "agent/roomset/roomset",
+      "style": {"navigationBarTitleText": "房间设置"}
+    },{
+      "path": "agent/roomset/gameset",
+      "style": {"navigationBarTitleText": "游戏设置"}
+    },{
+      "path": "agent/roomset/msgset",
+      "style": {"navigationBarTitleText": "消息设置"}
+    },{
+      "path": "agent/roomset/soundset",
+      "style": {"navigationBarTitleText": "通知铃声"}
+    }, {
+      "path": "copage/noticePop",
+      "style": {
+        "navigationStyle": "custom",
+        "backgroundColor": "transparent",
+        "app-plus": {
+          "animationType": "fade-in",
+          "background": "transparent",
+          "popGesture": "none"
+        }
+      }
+    },{
+      "path": "agent/manage/center",
+      "style": {"navigationBarTitleText": "管理中心"}
+    },{
+      "path": "agent/manage/apply",
+      "style": {"navigationBarTitleText": "申请管理"}
+    },{
+      "path": "agent/manage/groupApply",
+      "style": {"navigationBarTitleText": "入群管理"}
+    },{
+      "path": "agent/manage/umanage",
+      "style": {"navigationBarTitleText": "用户管理"}
+    },{
+      "path": "agent/manage/ulist/userlist",
+      "style": {"navigationBarTitleText": "用户列表"}
+    },{
+      "path": "agent/manage/ulist/sonuserlist",
+      "style": {"navigationBarTitleText": "子账号列表"}
+    },{
+      "path": "agent/manage/ulist/linkrecord",
+      "style": {"navigationBarTitleText": "链接生成记录"}
+    },{
+      "path": "agent/manage/report/repManage",
+      "style": {"navigationBarTitleText": "报表"}
+    },{
+      "path": "agent/manage/report/reportAll",
+      "style": {"navigationBarTitleText": "总报表"}
+    },{
+      "path": "agent/manage/report/reportUser",
+      "style": {"navigationBarTitleText": "用户报表"}
+    },{
+      "path": "agent/manage/report/betrecord",
+      "style": {"navigationBarTitleText": "下注记录"}
+    },{
+      "path": "agent/manage/report/reportWjs",
+      "style": {"navigationBarTitleText": "未结报表"}
+    },{
+      "path": "agent/manage/report/reportLogs",
+      "style": {"navigationBarTitleText": "日志报表"}
+    },{
+      "path": "agent/manage/oddsset",
+      "style": {"navigationBarTitleText": "赔率设置"}
+    },{
+      "path": "agent/manage/secondver",
+      "style": {"navigationBarTitleText": "二次验证"}
+    },
+    {
+      "path": "agent/manage/outbetmanage",
+      "style": {"navigationBarTitleText": "打单设置"}
+    },{
+      "path": "agent/manage/outbet/outbetlist",
+      "style": {"navigationBarTitleText": "打单配置列表"}
+    },{
+      "path": "agent/manage/outbet/addconfig",
+      "style": {"navigationBarTitleText": "添加打单配置"}
+    },{
+      "path": "agent/manage/outbet/outbetrecord",
+      "style": {"navigationBarTitleText": "打单记录"}
+    }
+  ],
+  "globalStyle": {
+    "pageOrientation": "portrait",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "",
+    "backgroundColor": "#fbfbfb",
+    // 设置默认的navbar背景色，根据自己的项目更改
+    // (mp端页面渲染的时候导航栏处会先出现导航栏的背景色，哪怕你用的是自定义的导航栏)
+    "navigationBarBackgroundColor": "#FFFFFF",
+    // 我们默认会取消掉所有的导航栏，使用自定义的导航栏
+    "navigationStyle": "custom",
+    "app-plus": {
+      /*"background": "rgb(20, 21, 26)",*/
+      "bounce": "none",
+      "scrollIndicator": "none"
+    }
+  },
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^u-(.*)": "@/uni_modules/uview-ui/components/u-$1/u-$1.vue",
+      "v-scroll": "@/layout/vScroll.vue",
+      "v-paging": "@/layout/vPaging.vue"
+    }
+  },
+  "tabBar": {}
+}

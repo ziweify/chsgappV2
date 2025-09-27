@@ -1,0 +1,2788 @@
+<!-- 聊天记录模式演示(nvue)，加载更多聊天记录无闪动 -->
+<template>
+  <view class="content">
+    <z-paging-swiper>
+      <template #top>
+        <view class="h-top">
+          <view class="h-bg" :style="{'height':windowObj.statusBarHeight+'px'}"></view>
+          <view class="h-bg h-bar">
+            <view class="h-bar-left" @click="backTo">
+              <u-icon style="margin-top:4rpx;" size="24" color="#fff" name="arrow-left"></u-icon>
+              <text class="h-bar-left-title">{{ curtime.gname }}</text>
+            </view>
+            <view class="h-bar-right">
+              <view class="h-bar-right-item">
+                <view class="h-bar-right-item-con">
+                  <text class="h-bar-right-item-con-text">积分:</text>
+                  <text class="h-bar-right-item-con-text">{{ balanceInfo.kmoney }}</text>
+                </view>
+                <view class="h-bar-right-item-con">
+                  <text class="h-bar-right-item-con-text">输赢:</text>
+                  <text class="h-bar-right-item-con-text" :class="balanceInfo.sy > 0 ? 'h-green' : (balanceInfo.sy < 0 ? 'h-red' : '')">{{ balanceInfo.sy }}</text>
+                </view>
+              </view>
+              <view class="h-bar-right-item">
+                <view class="h-bar-right-item-con" v-if="roomConfig.showTurnover == 1">
+                  <text class="h-bar-right-item-con-text">流水:</text>
+                  <text class="h-bar-right-item-con-text">{{ balanceInfo.jetotal }}</text>
+                </view>
+                <view class="h-bar-right-item-con" v-if="roomConfig.showTurnover == 0"><text class="h-bar-right-item-con-text"></text><text class=""></text></view>
+                <view class="h-bar-right-item-con">
+                  <text class="h-bar-right-item-con-text">回水:</text>
+                  <text class="h-bar-right-item-con-text">{{ balanceInfo.backWater }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+          <view class="h-drop-down">
+            <view class="h-drop-down-item">
+              <text class="h-drop-down-item-period">{{ curtime.shortPeriod }}</text>
+              <view class="h-drop-down-item-wating">
+                <view class="h-drop-down-item-wating-time">
+                  <view class="h-drop-down-item-wating-time-box">
+                    <view class="time-box" style="margin-right: 4rpx;">
+                      <text :class="{'h-red':curtime.fp === 1 && curtime.stopstatus === 0,'h-white':curtime.fp === 0}" class="time-box-base">{{ curtime.timearr && curtime.timearr[0] }}</text>
+                    </view>
+                    <view class="time-box">
+                      <text :class="{'h-red':curtime.fp === 1 && curtime.stopstatus === 0,'h-white':curtime.fp === 0}" class="time-box-base">{{ curtime.timearr && curtime.timearr[1] }}</text>
+                    </view>
+                    <view class="time-unit">:</view>
+                    <view class="time-box" style="margin-right: 4rpx;">
+                      <text :class="{'h-red':curtime.fp === 1 && curtime.stopstatus === 0,'h-white':curtime.fp === 0}" class="time-box-base">{{ curtime.timearr && curtime.timearr[2] }}</text>
+                    </view>
+                    <view class="time-box">
+                      <text :class="{'h-red':curtime.fp === 1 && curtime.stopstatus === 0,'h-white':curtime.fp === 0}" class="time-box-base">{{ curtime.timearr && curtime.timearr[3] }}</text>
+                    </view>
+                  </view>
+                  <view class="h-drop-down-item-wating-time-box less10" v-if="curtime.stopstatus === 10 && curtime.fp === 1 && curtime.timearr">
+                    <view class="time-box">
+                      <text class="base">{{ curtime.timearr && curtime.timearr[0] }}</text>
+                    </view>
+                    <view class="time-box">
+                      <view class="base">{{ curtime.timearr && curtime.timearr[1] }}</view>
+                    </view>
+                    <view class="time-unit">:</view>
+                    <view class="time-box">
+                      <view class="base">{{ curtime.timearr && curtime.timearr[2] }}</view>
+                    </view>
+                    <view class="time-box">
+                      <view class="base">{{ curtime.timearr && curtime.timearr[3] }}</view>
+                    </view>
+                  </view>
+                </view>
+                <text class="word1" v-if="curtime.stopstatus === 0 && curtime.fp === 1">封盘中</text>
+                <text class="word1" v-if="curtime.stopstatus === 1">未开盘</text>
+                <view class="drowbtns">
+<!--                  <image src="/static/image/icon/live.png" alt="直播" class="drowbtns-live-button"></image>-->
+                  <text class="drowbtns-btn" v-if="utype == 0" @click="betRecordTop">注单</text>
+                  <text class="drowbtns-btn" @click="dragonTop">长龙</text>
+                  <text class="drowbtns-btn" v-if="roomConfig.showPrediction == 1" @click="predictTop"> 预测</text>
+                </view>
+              </view>
+            </view>
+            <view class="h-drop-down-item" @click="showOpenListClick" v-if="openResult">
+              <text class="h-drop-down-item-period">{{ openResult && openResult.period }}</text>
+              <view class="h-drop-down-item-opened">
+                <view v-if="template === 'PK10' && openResult.property !== undefined" class="pk10">
+                  <view class="pk10-ball" v-for="(item,index) in openResult.openNum" :key="'m'+index">
+                    <image class="pk10-ball-image" :src="'/static/opennum/ball-'+item+'.png'"></image>
+                  </view>
+                  <view class="pk10-sum">
+                    <text class="pk10-sum-title">冠亚和</text>
+                    <view class="pk10-sum-wrap">
+                      <text class="pk10-sum-wrap-text">{{ openResult.property.sum }}</text>
+                      <text style="margin-left: 1px;" :class="{'h-red':openResult.property.bigSmall === '大','h-blue':openResult.property.bigSmall === '小'}" class="pk10-sum-wrap-text">{{ openResult.property.bigSmall }}</text>
+                      <text style="margin-left: 1px;" :class="{'h-red':openResult.property.singleDouble === '双','h-blue':openResult.property.singleDouble === '单'}" class="pk10-sum-wrap-text">{{ openResult.property.singleDouble }}</text>
+                    </view>
+                  </view>
+                </view>
+                <view v-if="template === 'SSC' && openResult.property !== undefined" class="ssc">
+                  <view class="ssc-ball" v-for="it in openResult.openNum" :class="'ball-'+it">
+                    <text class="text">{{it}}</text>
+                  </view>
+                  <view class="ssc-sum">
+                    <text :class="{'h-red':openResult.property.sumBigSmall === '大','h-blue':openResult.property.sumBigSmall === '小'}" class="text">{{ openResult.property.sumBigSmall }}</text>
+                    <text style="margin-left: 10rpx;" :class="{'h-red':openResult.property.sumSingleDouble === '双','h-blue':openResult.property.sumSingleDouble === '单'}" class="text">{{ openResult.property.sumSingleDouble }}</text>
+                    <text style="margin-left: 10rpx;" :class="{'h-red':openResult.property.dragonTiger === '龙','h-blue':openResult.property.dragonTiger === '虎','h-green':openResult.property.dragonTiger === '和'}" class="text">{{ openResult.property.dragonTiger }}</text>
+                  </view>
+                </view>
+              </view>
+              <view class="drop-down-arrow">
+                <u-icon size="20" color="#e6e6e6" :name="isShowOpenList ? 'arrow-up-fill' : 'arrow-down-fill'"></u-icon>
+              </view>
+            </view>
+          </view>
+          <view :style="{'height':isshowpredict ? '400rpx' : '0px'}" class="predict-box">
+              <view class="predict-box-top">
+                <view class="right-border van-col"><text class="text">名次</text></view>
+                <view class="van-col"><text class="text">本群预测</text></view>
+                <view class="van-col"></view>
+                <view class="van-col"></view>
+              </view>
+              <list class="long-detail">
+                <cell class="long-detail-item" v-for="item in predictInfoList">
+                  <view class="right-border van-col">
+                    <view><text class="text">{{ item.name }}</text></view>
+                  </view>
+                  <view class="right-border van-col"><text class="text">{{ item.referenceNum }}</text></view>
+                  <view class="right-border van-col">
+                    <text class="big-single text" :class="item.bigOrSmall == '小' ? 'bg-orange' : 'bg-blue'">{{ item.bigOrSmall }}</text>
+                  </view>
+                  <view class="van-col">
+                    <text class="big-single text" :class="item.singleOrDouble == '双' ? 'bg-orange' : 'bg-blue'">{{ item.singleOrDouble }}</text>
+                  </view>
+                </cell>
+              </list>
+            </view>
+          <view :style="{'height':isclshow ? '400rpx' : '0px'}" class="changlong-box">
+            <view class="changlong-box-top">
+              <view class="van-col"><text class="text">序号</text></view>
+              <view class="van-col"><text class="text">位置</text></view>
+              <view class="van-col"><text class="text">结果</text></view>
+              <view class="van-col"><text class="text">连期</text></view>
+            </view>
+            <list class="long-detail">
+              <cell class="long-detail-item" v-for="(item,index) in cllist">
+                <view class="van-col"><text class="text">{{ index+1 }}</text></view>
+                <view class="van-col"><text class="text">{{ item.position }}</text></view>
+                <view class="van-col"><text class="text">{{ item.betItem }}</text></view>
+                <view class="van-col"><text class="text" style="color: rgb(254, 1, 1);">{{ item.times }}</text></view>
+              </cell>
+            </list>
+          </view>
+          <view :style="{'height':isShowOpenList ? '400rpx' : '0px'}" :class="'open-num-list-'+template.toLowerCase()">
+              <view class="open-num-head">
+                <text class="period text">期数</text>
+                <view class="open-num-title">
+                  <view class="scnumList" v-if="template == 'PK10'">
+                    <view class="numList">
+                      <text class="text">一</text>
+                      <text class="text">二</text>
+                      <text class="text">三</text>
+                      <text class="text">四</text>
+                      <text class="text">五</text>
+                      <text class="text">六</text>
+                      <text class="text">七</text>
+                      <text class="text">八</text>
+                      <text class="text">九</text>
+                      <text class="text">十</text>
+                    </view>
+                    <text class="gyhe">冠亚和</text>
+                    <text class="lh">1-5龙虎</text>
+                  </view>
+                  <view class="sscnumList" v-if="template == 'SSC'">
+                    <view class="numList">
+                      <text class="text">一</text>
+                      <text class="text">二</text>
+                      <text class="text">三</text>
+                      <text class="text">四</text>
+                      <text class="text">五</text>
+                    </view>
+                    <text class="kjjg">开奖结果</text>
+                  </view>
+                </view>
+              </view>
+              <list v-if="template == 'PK10'" class="open-num-data">
+                <cell class="item-list-cell" v-for="(item,index) in openresultlist">
+                  <text class="period">{{ item.shortPeriod }}</text>
+                  <view class="open-number">
+                    <view class="num-left">
+                      <image class="num-left-image" v-for="it in item.openNum" :src="'/static/opennum/ball-'+it+'.png'"></image>
+                    </view>
+                    <view class="first-sum">
+                      <view class="first">
+                        <text class="text">{{ item.property.sum }}</text>
+                        <text class="blue text">{{ item.property.bigSmall }}</text>
+                        <text class="blue text">{{ item.property.singleDouble }}</text>
+                      </view>
+                      <view class="two">
+                        <text class="text" :class="item.property.dragonTigerNum1 == '龙' ? 'red' : 'blue'">{{ item.property.dragonTigerNum1 }}</text>
+                        <text class="text" :class="item.property.dragonTigerNum2 == '龙' ? 'red' : 'blue'">{{ item.property.dragonTigerNum2 }}</text>
+                        <text class="text" :class="item.property.dragonTigerNum3 == '龙' ? 'red' : 'blue'">{{ item.property.dragonTigerNum3 }}</text>
+                        <text class="text" :class="item.property.dragonTigerNum4 == '龙' ? 'red' : 'blue'">{{ item.property.dragonTigerNum4 }}</text>
+                        <text class="text" :class="item.property.dragonTigerNum5 == '龙' ? 'red' : 'blue'">{{ item.property.dragonTigerNum5 }}</text>
+                      </view>
+                    </view>
+                  </view>
+                </cell>
+              </list>
+              <list v-if="template == 'SSC'" class="open-num-data">
+                <cell class="item-list-cell" v-for="(item,index) in openresultlist">
+                  <text class="period">{{ item.shortPeriod }}</text>
+                  <view class="open-number">
+                    <view class="num-left ssc">
+                      <view class="ssc-ball" v-for="it in item.openNum" :class="'ball-'+it">
+                        <text class="text">{{it}}</text>
+                      </view>
+                    </view>
+                    <view class="sscSum">
+                      <text class="text" :class="item.property.sumBigSmall == '大' ? 'h-red' : 'h-blue'">{{ item.property.sumBigSmall }}</text>
+                      <text style="margin-left: 10rpx;" class="text" :class="item.property.sumSingleDouble == '双' ? 'h-red' : 'h-blue'">{{ item.property.sumSingleDouble }}</text>
+                      <text style="margin-left: 10rpx;" class="text" :class="item.property.dragonTiger == '龙' ? 'h-red' : item.property.dragonTiger == '虎' ? 'h-blue' : 'h-green'">{{ item.property.dragonTiger }}</text>
+                    </view>
+                  </view>
+                </cell>
+              </list>
+              <view class="btn">
+                <button class="btn-item" @click="tokjresult"><text class="text">查看更多</text></button>
+              </view>
+          </view>
+          <block v-if="utype == 0">
+            <view class="bet-history-box" :style="{'height':betRecordShow ? '400rpx' : '0px'}">
+              <list>
+                <cell>
+                  <uni-collapse :accordion="true" @change="betRecordTabChange">
+                    <uni-collapse-item v-for="item in periodOrderList">
+                      <template v-slot:title>
+                        <view class="bet-list-item">
+                          <view class="item-up">
+                            <text class="strong">第{{ item.period }}期</text>
+                            <text v-if="item.isSettle" class="text" :class="item.winLose > 0 ? 'green' : (item.winLose < 0 ? 'red' : '')">{{ item.winLose > 0 ? "+"+item.winLose : item.winLose }}</text>
+                            <text v-if="!item.isSettle" class="text blue">未结算</text>
+                          </view>
+                          <view class="item-down">
+                            <text class="total text">注数：{{ item.totalCount }}注</text>
+                            <text class="tmoney text">金额：{{ item.totalMoney }}</text>
+                            <text class="text">收益</text>
+                          </view>
+                        </view>
+                      </template>
+                      <view class="bet-detail" v-for="order in item.orders">
+                        <view class="bet-item">
+                          <text class="left text">{{ order.playGroupName }}[{{ order.playDetailName }}/{{ order.je }}]</text>
+                          <text class="time text">{{ order.time }}</text>
+                          <text v-if="order.isSettle" class="text status" :class="order.winLose > 0 ? 'green' : (order.winLose < 0 ? 'red' : '')">{{ order.winLose > 0 ? "+"+order.winLose : order.winLose }}</text>
+                          <text v-if="!order.isSettle" class="text blue status">未结算</text>
+                        </view>
+                      </view>
+                    </uni-collapse-item>
+                  </uni-collapse>
+                </cell>
+              </list>
+            </view>
+          </block>
+        </view>
+      </template>
+      <swiper class="swiper" :current="swiperCurrent" @change="onSwiperChange">
+        <swiper-item>
+          <list @scroll="scroll">
+            <cell class="item" @touchstart="touchstart" v-for="(item,index) in chatList" :key="'m'+index" :style="cellStyle">
+              <view class="chat-item">
+                <view :class="{'chat-container':true,'chat-location-me':item.sender == uid}">
+                  <view class="chat-icon-container">
+                    <!--				<image class="chat-icon" :src="toImageUrl(item.avatar)" mode="aspectFill" />-->
+                    <u-image :shape="shape" class="chat-icon" :showLoading="true" :src="toImageUrl(item.avatar)" mode="aspectFill">
+                      <template v-slot:loading>
+                        <u-loading-icon color="#0087b4"></u-loading-icon>
+                      </template>
+                    </u-image>
+                  </view>
+                  <view class="chat-content-container">
+                    <text :class="{'chat-user-name':true,'chat-location-me':item.sender == uid}">
+                      {{item.nickname}}
+                    </text>
+                    <view class="chat-text-container-super" :style="[{justifyContent:item.sender == uid?'flex-end':'flex-start'}]">
+                      <view v-if="item.chatType == 'text'" :class="{'chat-text-container':true,'chat-text-container-me':item.sender == uid}" @longpress="onLongPress($event,index)">
+                        <text class="ch-text" v-if="item.isA" :class="utype == 0 ? 'name' : 'name1'">@{{ item.isA }}</text>
+                        <text class="ch-text" v-if="!item.mtype || item.mtype == 0">{{toStr(item.content)}}</text>
+                        <template v-if="item.mtype && item.mtype == 1">
+                          <view v-for="(cc) in item.content" :style="{'flexDirection': cc.otype == 'order' ? 'column' : 'row'}">
+                            <text class="ch-text" v-if="cc.ctype === 'text'">{{toStr(cc.con)}}</text>
+                            <rich-text class="ch-text" v-if="cc.ctype === 'html'" :nodes="parsehtml(cc.con)"></rich-text>
+                            <view v-if="cc.otype === 'order'">
+                              <text class="ch-text" @click="msgOrderDetail(item.other[cc.uid],cc.otype)" :class="utype == 0 ? 'name' : 'name1'">注单详情</text>
+                            </view>
+                            <view v-if="cc.otype === 'orderlist'">
+                              <text class="ch-text" @click="msgOrderDetail(item.other[cc.uid],cc.otype)" :class="utype == 0 ? 'name' : 'name1'">注单详情</text>
+                            </view>
+                            <view v-if="cc.otype === 'settle'" style="flex-direction:row;">
+                              <view style="margin-left: 20rpx;">
+                                <text class="ch-text" @click="msgOrderDetail(item.other[cc.uid],cc.otype)" :class="utype == 0 ? 'name' : 'name1'">注单详情</text>
+                              </view>
+                            </view>
+                          </view>
+                        </template>
+                        <template v-if="item.mtype && item.mtype == 2">
+                          <template v-for="(cc) in item.content">
+                            <rich-text class="ch-text" :nodes="parsehtml(cc.con)"></rich-text>
+                          </template>
+                        </template>
+                      </view>
+                      <view v-if="item.chatType == 'image'" class="chat-imgae">
+                        <image style="width: 440rpx;height: 300rpx" :data-src="toConImageUrl(item.content)" @click="clickImg" :src="toConImageUrl(item.content)" lazy="loaded"></image>
+                      </view>
+                    </view>
+                  </view>
+                </view>
+              </view>
+            </cell>
+            <cell><view ref="h-list-bottom-tag"></view></cell>
+          </list>
+          <view class="coIcon" v-if="coicon1" @click="isshowright = !isshowright">
+            <view class="span1">
+              <image class="image" v-if="!isshowright" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACcAAAAnCAMAAAC7faEHAAAB7FBMVEVHcEz///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////+wOur2AAAAo3RSTlMAhB769vsb/v0CAb8VMgsM/A7pdOIx6s5g8ddTaewtFscSyoAFJGXL9dYDxobUEO5z0NoZJSlWwPLciIp/5IkvoD3dIQfDOeGu+bAordE81fTgUqNoR+dCe7M2P7iSqY58CruFCbZ+sQiDOHjrT4wNWBomTXlZxJ2cp3EUb6T45dlAXCAr31cjTsy+PkFtNG4Eq0ssLhf3gmuvwmrtH+ZENRPTAbDLLwAAAjFJREFUGBl9wQVDGgEAhuGPPEDA7u6csdSVXetQN113d3d3d+f7R3eHggcDn0dxasc212e5M0ob12yd8iuFgboqbIY/lSuJQMEKEjQsDSuRNw2TUeHY1O30rh7PnnRj2vhM8XrzgM6V/YrJLOkDPFdl99YNRk9QcWqyG4AWzep1Q2Gx/pM7DBxTlDcPskJKItgMxjlNC6RBYUhJVc6H0gWKKACjWCmcbYMbsgysgB6ldAGMkEx10BlUakvgjUxVsFJzeA6uoFQLRr9MRwpPKk7L8eWyFME3aQwqZPJ7YJdsloLHL1M1jEibwSHLTsChmIPAiCzrIE+qh02yHN4LnNeMdiBtvyzpPqhUFrxXxJ5B4LoiSgyoSNe0CcjVR3BqWmYVGHUyFfggv1Uz1sM2ucCrGZUd4LsrPcyAedcU9Rd+6TusVlR5EXiKH7tg/gLFbITfaoRxxXi7YPQmPHAqpsYFP/QFsjXrXg6mW480qww2BLQVJmWzcAKyFsnmBQxKQ+DOlM39213dskuD5ZI/B0o0h4U+KJPkgL7XSu0y1Mv0wQ3ZSik3AxbLsgw2LFIKp+ZBh1+W9BxY36qkAqvAd1TT7mTAxUwl4d8B7FNUO5Dv1H/SDwHbmxSzDCg9rQShtUBzWDa7DWDJFtnUXvIAB8KKc6INU1H1urBMNWWvnvoAn6NJCc5cMbAYPxvX5owSkT+kJF6ucWH3ZLFfyZV/XpVHRMPX6nea05/cbVumnAEl+AcVNeYU6LJ/mQAAAABJRU5ErkJggg==">
+              </image>
+              <image class="image" v-if="isshowright" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACcAAAAnCAMAAAC7faEHAAAB6VBMVEVHcEz///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////+oS8NlAAAAonRSTlMAhB769vsb/v0CAb8VMgsM/A7pdOIx6s5g8ddT7GktEscWyoAk4GUFy/XWA4YQxu7U0NpzGcApViXyiNyKf6CJL+TdPSEHwznh+a6wrSg81dH0Ukdoo+dCs3s2P0+Muwp5hZKDtusIsXgJuHypfjiODVkaTZ2cJhRvxFhxp6Qg5U5X+Fwj2UArbT7MvkE0BG5LLKsuF/eCa6/Cau01RObTHxPZei8IAAACMklEQVQYGX3BBUMaAQCG4Y88UhGxu2ubrufKhbHQ9ax1d3d3d3e9v3R3IHgg+DxK07hte2vUHalsHxwb9yuHvuZ6bNZ8rlMWgdKVZGhbnKdM3iAmo9axZYXTO7S1cNSNqemZ0q0uBrp7epVSULUK8NyQ3Vs3GMtDStNS2AbM0KTVbiir0BRFa4CjSvIWQzSsLEKzwLighEAQysLKqmYOVM5TXCkYFcrhcifckqVvJSxXTufACMvUDN0h5TYf3stUDz2axktwhaRGMHpl8+TRkhWyK4fv0jaolc2iYYgukE0DrJO2g0OTbscw3XmoSRugWGqFLUrxLoG196HJqZR8H9QoCh+UVFcOnoq7LpgzTynDUKRP4NSEmtngeyDdi0DXFSVthB1ygVcJBfVgNMtU6oOSmZrwB37pBwwpbk8/cFVxVQbU5iuhCX6qHbbKcng3sFcT5gLBY7K0uOCvvkKhLCcBh1JOAetkqYbNAY3BqEx+D5yRzWLw+GV6Cv3SALgLZDpQtktpZhxaJksQlkn+GFRpGot8UC3JAateK7dL0CrTRzcUKqeiCCyUZSlsXqAcznbBbL8s+THYOFNZBdaD77QSHkfgWoGy8O8H9ilpLlDi1BT5R4DjHUpZClReV4bwJmBWnmxOGMD8Edk0XvQAB/OUZmcnpvKGDXkytVS/eeEDfI4OZTh/08Bi/G7fFFtLXMmAsng16MLu+UK/sqv7sr6YuLZvDe80rX9FO0bGnQFl+A+swOSlXIZbNQAAAABJRU5ErkJggg=="></image>
+            </view>
+          </view>
+          <view class="right-icon" v-if="isshowright">
+            <view class="switch span1" @click="switchGame">
+              <image class="image" src="/static/image/icon/qiegame.png"></image>
+            </view>
+            <view class="customer span1" @click="customerTo">
+              <image class="image" src="/static/image/icon/customer.png"></image>
+            </view>
+            <view v-if="siteConfig.kjwurl" class="openResult span1" @click="siteTo">
+              <image class="image" src="/static/image/icon/kjw.png"></image>
+            </view>
+            <view v-if="utype == 0" class="span1" @click="swiperCurrent = 1">
+              <image class="image beticon" src="/static/image/icon/pan.png"></image>
+            </view>
+          </view>
+          <view class="h-floatbtn">
+            <image class="h-floatbtn-image" @click="toBottom(true)" v-if="!emojiType && !isAtBottom" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAMAAAC8EZcfAAABqlBMVEVHcEw2Njb5+fkwMDA7Ozv4+Pj6+vr19fVCQkL39/cuLi78/PwvLy8xMTE1NTX8/PwvLy8wMDDf39+9vb2pqanU1NTv7++zs7MuLi4xMTErKystLS0uLi4xMTEsLCz6+vr6+vr29vb9/f38/Pzs7Oz8/Pzw8PDc3NyGhoZubm55eXnz8/P6+vrY2NjCwsLY2Njz8/Pz8/Ph4eH09PTt7e3r6+vPz8/5+fmBgYFPT0+5ubnw8PD4+Pi8vLzv7+/y8vL6+vrb29v19fX29vafn5/7+/u4uLj8/Pzs7Ozs7Ozn5+eRkZH19fW/v7/j4+Pp6enm5ubz8/Pk5OSurq6bm5vKyspfX1/X19f39/fp6enQ0NBVVVXo6OjGxsadnZ2xsbG/v7/U1NT6+vrd3d319fU+Pj76+vqnp6f4+Pj4+Pj19fXt7e2tra3o6Oj09PRcXFzf39/MzMyvr6/Ozs6/v7/y8vLQ0NDu7u7w8PDX19fv7+/l5eXu7u7z8/Ph4eHf399QUFCioqLi4uKsrKz4+Pjq6urp6en39/ft7e3v7++EhIT39/f8/PympqZRj4lKAAAAjXRSTlMACdMMBtPR1QPUGM4SFA7PEB/f8f3l2PcbGh0hJCcjzqHRy8isv5aCOC8KwsMrH+PHnY2mdZ5OuRgtV1KOWqm4ln9vzkGwFrpE2txCsC2VpJyJfEI3JCNCyy1hFZBnRlRLMpAlxSN9DoVxyD9NP3IMOOn56PC/d7a6R6BqhoBteSBJVzS8iJi0Oao0Yar1uaHpAAAJ+0lEQVR42uXd93vTRhgH8DiOa6pYxoaGRo6DPLMTMkhCM8gmtMxSoJRdoOzVvfce/p97956kOw3bNyQ5fXq/EfrA5/m+dyfprXR0df1Pxj7f2MO0vcNkID2+0XElQxu7e/Lv+yvrpX8W65VKffGf0vrK/b9P3h1jmJ3RIcCDJ4/u7FT2B47Kzp1HTx44yvh1Y39slhxbr2c4ytLmH2NxGm3dg+X1Kit7xTNYZ3V9+UFMRruyzx5WHdwrLYaDrD58Ztc6et6lR7uWjrV0u4ZHif/73UeXoiVavLsPK26dbUoxw+skxsrDu9ERLd57K72szidzDxYJxt6V9yIiWrw7bHjU9mrgoEo2xjsWMQLeifuQnlvHgNLO8CoZI/oT7p8Im0h8y3WHZ+l8MO9gkLYRE+vLoQoJb7LE8Kgu3XawRodYmgyPCL6xzYqLx6vzGCmxsjkWjpDEN+XER3lpoeEmQohTYYRIfE/qXl5aYniJ9SfqQnJP8BzFp8zzE/fvf07uIhR9J0pMfCo8SnRCLJ1QEpLpt0N8YfA8RCTcmVIQkt1l1yovqW46hGHVmZR5d1JaCL6XE2x86ZAGG+LES0kh9iVOVqPwuYXVkwkZIfFViC9kHiWCsCIjBN/LamQ+l7D6UlgIvkmYf93R+Jgyo3k4KSgE39QunX7pSAadiLtTQkKyP+/Q/NLpaIW9vTsiOzb4XpSi97HC0gtuIfgSz+PwscLnCV4h+J7F42OFz0DIu0Dqzv6STscgxAulzrdQwIcmYFw+Rlh6wSOEAm/G6GOEmxxFJju02RujzxH2mu33a/AlS2SBxOUDISyUUrKdEAq8HGuBXUVeblNkCPBYPW4fFdaPtYyQFPjb3th9dBp+27LIUOD3TQgwXh+ZhugvNt9vUWQS4HonAqQRrreIkAQY9wr2ruTmEZIAVzpSYKbIK00jhADPmB0pMFNk80yTCEmAb3csQCfCt5tECAFe6lyANMJLwRFCgEc7GKAT4VGIMDDA7C8dDNCJ8JdsUIQQ4LsdDdCJ8N2ACCFAvER4AnzzyAE5wJEjh3gixMvEK4QAj1W5AnzrtUbjoATv0OuNxkeHOCKsHvNHCMCf+AI82GjICLGv0fiYJ8KffECyRGb4ZiAAhYXE1/iQZxbO+JYJBHiNr8LpAw0JoeV77U0eYPWaN0J7DfPtMX3iQtt3gG+n8a5jUuGj3HuMsJDXZ0d41FNjCDA3x78JCgr5fRZwLueOkGwypsBVREgo4LNqbLo3GlLhL4WuIgJCEZ8d4ZeuGkOAAlNQTCjmcyYhGyGZgkOC9wmcQkGfVeOhnA+Y+R2AAlsHl1DUh4QY+HvGC8xeM4VvZDiE4j5SY/NalgLxGklmz0jcabUVSvisSXgmm3RWCZmCCzJPm22EMj7r+XOBmYQE+LXUvXRLoZTPWiVfe4GZb0TXSFuhnM9aJd9kvMAhyZv9pkJZH5mEQx5gNjMj+zTSRCjtI8CZjLOMyYUuMyf9uBQolPcR4FzGudiRXUY/Lf88FyBU8BHgad3ZZ8iVWF9U6Gn5hCo+ss8s6s7VmOwy+oTKE7tHqOQj+8yEnvMATaldJlCo5iP7jBkykBWq+poAJ9SAVKjsSweXeFER6AiVfQBc9AFPqwJtobIPgKd9wDllICNU8gFwzgec4Qc27W71tfG1624xwBkfcIgb2KK71dfKx9HdosAhH/BXbmCr7lZfa1+77hYF/uoDficGbCY8cPCTtxS6Ww7wOx9wgftSF2V3y7nULXiAWf1n/puFCLtbzs3Cz66bBXS7lTFM/ruZCLtbFtA0MuztFr5h1dai6czIdWfWNHrDat3ya0ORdGYkuzNDGr3ltx6atAvdEXRmJLsz3Rc031OdtiB2rYuqu0V2mQUfMKdfNsVuqSPqbsEuY17WfZ0FXTsu+FASVXcLVfi45gHifUb7fu90t77XMkzzyF7Gt/dOd+s2u4idVfKDKXxHGEl3C03BH7SMvwWsG1+lwu2/yXbfUl8Zur8FnNW1q92h9t+ku2/dVzXd20SHSXj5isSje9jdLQS8cpm90DGT0LieCk8o70tdN9xTkO6Et6XaM6F2t8ga1v3/KwxqXBgPq4ep0r0cL3grTGt8IRWOUMWXuuCrMK3xRTOULqtSd9W86KswrXH/9TC6rGrd1ev9/grbNdaNiyl1oZovddHQM03e+kB7deE35T6wYvf3t4Jnl2Zf7EE1fielKlTzpd7phyUS9OoRLJPCvGqnWq07PV8IWCKuZSIfoXJ3yw4w8OUyGuGsci9doXs+2yxAJsLRe6pCed+90aYBWq+I4givKryg16fQvUTAq06A+7qaR5j/U0HYtLvF4/sz3zxANsJtszNvAZvbrQKkERr5jc686L2RN1oEaEeIi/zB8U68Kn/8A1zgVl8bWJcTVOS/7sUPvPcXKnDgRSQgwvxS/J9rLOXbBcisk/78cNwfvAwjX6sV4i1yrNMQJmDbAruKbORH1+IEro3CCk5yfhYG03BkPL7P1sZHOCYgW2SYhtuP4/rw7/G2PQF7OL5MRBGi7RpNw/zTrXg+ndx6mscTMJvg/7gTpmFhYLUcx8en5dWBgsFZYFpkWCgDq1vRf767tTpgL5Aezu+LGeHTx1F/AP34KesT+EQ7mQPh9ni0n5CPb4MvJ+Bjhf35gZG1KD/CXxsZwBuMmM9eynizQRmO1qI7xqA2ivPDG4zMQQt2lQeHozoIYnjQrq/cURVEWMgfXpqO4iiN6aXD+YKkzyscqYV/GEltRMXnCNFug5dKcaMc7nEu5Y0iXh6wvyTkD5yB/VAH4c1amAfi1G6CTxfa/1oIcZmLN6bDOlJo+kYRyqvmo8KcVebR2XAOZZodtcqbU/PZQqvMBUT8cV79WKv5HxGvYJU3EcbBW5YQh3i4ePO82sFg528WD0N8ofjso9USSbTfwExExFNny7JHq5XPnsI8mH25pFXeUA5/gxDxTMR1Lo4Mj8scTjc+PFIk1dUyNL6wzs9DIZI6Q4qDt85eETve78rZW4OQnlXdZCLkAwghxBxDfOPGuS3eAxK3zt14g+HlQoyvGZEYb23Uyu2OmCzXNm4RXWQ8R0iJhmVEyKXh+S/KwYd0lr+YH15COEtnMLyozhGFqZjLuIzFwcHBU6ufzZ4/V/v80+lyefrTz2vnzs9+tnoK/UbRpcO8ZCQ85hTgBCwXTCTG/AAoMdM1imBDOKLDPKxL9ER+li0hkhjRfAQkUiInHkiFB/51HnD9mkbDS/TEchowItpGQBoGYoKTjgKiGQbgHF0ivvOUbSNGWkqA2sP6AbYhnKPrie1EamrESKxETPfAP8sBzqWL9VBvMGIkZmIoHfjX8BuJ2HVeI1FaTmaQn7In4HfFPLwn8idcw3s6f1dHxt7+hwMClPv+U/9CRNf/ZPwL+6IcPUObdoIAAAAASUVORK5CYII="></image>
+            <text v-if="unreadCount > 0 && unreadCount < 99" class="h-floatbtn-unread-message">{{ unreadCount }}</text>
+            <text v-if="unreadCount > 99" class="h-floatbtn-unread-message">99+</text>
+          </view>
+          <view class="chat-input-bar-container">
+            <view class="chat-input-bar">
+              <view class="key-board" @click="emojiChange('iskeyshow','isbuttonsshow')">
+                <image class="image" src="/static/image/icon/keybtn.png"></image>
+              </view>
+              <view class="chat-input-container">
+                <input :placeholder="balanceInfo.room_status == 2 ? '禁言中' :''" :disabled="balanceInfo.room_status == 2" ref="chatinput" :readonly="roomConfig.banChat == 1" :focus="ismsgfocus" @blur="ismsgfocus = false" class="chat-input" v-model="sendmsg" :adjustPosition="false" type="text"/>
+              </view>
+              <view class="chat-input-send" v-if="utype == 0">
+                <image class="image" @click="emojiChange('isbuttonsshow','iskeyshow')" v-if="sendmsg.length <= 0" src="/static/img/more.png"></image>
+                <image class="image" @click="sendevent" v-if="sendmsg.length > 0" src="/static/img/send.png"></image>
+              </view>
+              <view class="chat-input-send" v-if="utype == 1">
+                <image class="image" @click="sendevent" src="/static/img/send.png"></image>
+              </view>
+            </view>
+            <!--  表情面板，这里使用height控制隐藏显示是为了有高度变化的动画效果（如果不需要切换表情面板则不用写） -->
+            <list class="emoji-panel-container" :style="[{height: emojiType ? heightArr.keyHeight+'px' : '0px'}]">
+                <cell>
+                  <block v-if="utype == 0">
+                    <view class="key-board" v-if="iskeyshow">
+                      <view class="nav_1">
+                        <view class="key-board-ul-li" @click="myonkey('梭哈',0)"><text class="text">梭哈</text></view>
+                        <view class="key-board-ul-li" @click="myonkey('取消',1)"><text class="text">取消</text></view>
+                        <view class="key-board-ul-li" @click="myonkey('上分',1)"><text class="text">上分</text></view>
+                        <view class="key-board-ul-li" @click="myonkey('查',1)"><text class="text">查</text></view>
+                        <view class="key-board-ul-li" @click="myonkey('下分',1)"><text class="text">下分</text></view>
+                        <view class="key-board-ul-li" @click="myonkey('重复',1)"><text class="text">重复</text></view>
+                      </view>
+                      <view class="nav_2" v-if="isshowssckey">
+                        <view class="nav_2-line">
+                          <view class="key-board-ul-li" @click="myonkey('前三',0)"><text class="text">前三</text></view>
+                          <view class="key-board-ul-li" @click="myonkey('中三',0)"><text class="text">中三</text></view>
+                          <view class="key-board-ul-li" @click="myonkey('后三',0)"><text class="text">后三</text></view>
+                          <view class="key-board-ul-li" @click="myonkey('总和',0)" style="border-right: none"><text class="text">总和</text></view>
+                        </view>
+                        <view class="nav_2-line">
+                          <view class="key-board-ul-li" @click="myonkey('豹子',0)"><text class="text">豹子</text></view>
+                          <view class="key-board-ul-li" @click="myonkey('对子',0)"><text class="text">对子</text></view>
+                          <view class="key-board-ul-li" @click="myonkey('顺子',0)"><text class="text">顺子</text></view>
+                          <view class="key-board-ul-li" @click="myonkey('半顺',0)"><text class="text">半顺</text></view>
+                          <view class="key-board-ul-li" @click="myonkey('杂六',0)" style="border-right: none"><text class="text">杂六</text></view>
+                        </view>
+                      </view>
+                      <view class="nav_pcdd" v-if="isshowssckey == 1111">
+                        <view class="key-board-ul-li">大单</view>
+                        <view class="key-board-ul-li">小单</view>
+                        <view class="key-board-ul-li">大双</view>
+                        <view class="key-board-ul-li">小双</view>
+                        <view class="key-board-ul-li">极大</view>
+                        <view class="key-board-ul-li">极小</view>
+                        <view class="key-board-ul-li">特码</view>
+                        <view class="key-board-ul-li">豹子</view>
+                      </view>
+                      <view class="key-board-content">
+                        <view class="nav_3">
+                          <view class="key-board-ul-li" @click="myonkey('大',0)"><text class="text">大</text></view>
+                          <view class="key-board-ul-li" @click="myonkey('小',0)"><text class="text">小</text></view>
+                          <view class="key-board-ul-li" @click="myonkey('单',0)"><text class="text">单</text></view>
+                          <view class="key-board-ul-li" @click="myonkey('双',0)" style="border-bottom: none"><text class="text">双</text></view>
+                        </view>
+                        <view class="nav_4">
+                          <view class="nav_4-line">
+                            <view class="key-board-ul-li" @click="myonkey('1',0)"><text class="text">1</text></view>
+                            <view class="key-board-ul-li" @click="myonkey('2',0)"><text class="text">2</text></view>
+                            <view class="key-board-ul-li" @click="myonkey('3',0)"><text class="text">3</text></view>
+                            <view @longpress="longpressDel" class="key-board-ul-li drop-down-arrow1" @click="myonkey('删',0)" style="border-right: none"><text class="text h-red">删</text></view>
+                          </view>
+                          <view class="nav_4-line">
+                            <view class="key-board-ul-li" @click="myonkey('4',0)"><text class="text">4</text></view>
+                            <view class="key-board-ul-li" @click="myonkey('5',0)"><text class="text">5</text></view>
+                            <view class="key-board-ul-li" @click="myonkey('6',0)"><text class="text">6</text></view>
+                            <view class="key-board-ul-li" @click="myonkey('龙',0)" style="border-right: none"><text class="text h-red">龙</text></view>
+                          </view>
+                          <view class="nav_4-line">
+                            <view class="key-board-ul-li" @click="myonkey('7',0)"><text class="text">7</text></view>
+                            <view class="key-board-ul-li" @click="myonkey('8',0)"><text class="text">8</text></view>
+                            <view class="key-board-ul-li" @click="myonkey('9',0)"><text class="text">9</text></view>
+                            <view class="key-board-ul-li" @click="myonkey('冠亚',0)" style="border-right: none"><text class="text h-green">冠亚</text></view>
+                          </view>
+                          <view class="nav_4-line">
+                            <view class="key-board-ul-li" @click="myonkey('/#',0)" style="border-bottom: none"><text class="text">/&nbsp;&nbsp;#</text></view>
+                            <view class="key-board-ul-li" @click="myonkey('0',0)" style="border-bottom: none"><text class="text">0</text></view>
+                            <view :class="{'taking':roomConfig.banChat == 1}" class="key-board-ul-li" @click="myonkey('闲聊',0)" style="border-bottom: none"><text class="text">闲聊</text></view>
+                            <view class="key-board-ul-li" @click="myonkey('虎',0)" style="border-right: none;border-bottom: none"><text class="text h-blue">虎</text></view>
+                          </view>
+                        </view>
+                      </view>
+                    </view>
+                  </block>
+                  <view class="chat-form-buttons show" v-if="isbuttonsshow">
+                    <view class="chat-form-buttons-list">
+                      <view class="chat-form-buttons-list-line">
+                        <view class="chat-form-buttons-list-li">
+                          <view class="cont">
+                            <image class="image" src="/static/image/icon/shangxiafenbtn.png" lazy="loaded"></image>
+                          </view>
+                          <text class="text">上下分</text>
+                        </view>
+                        <view class="chat-form-buttons-list-li">
+                          <view class="cont">
+                            <image class="image" src="/static/image/icon/applyrecordbtn.png" lazy="loaded"></image>
+                          </view>
+                          <text class="text">申请记录</text>
+                        </view>
+                        <view class="chat-form-buttons-list-li">
+                          <view class="cont">
+                            <image class="image" src="/static/image/icon/gamerecordbtn.png" lazy="loaded"></image>
+                          </view>
+                          <text class="text">游戏记录</text>
+                        </view>
+                        <view class="chat-form-buttons-list-li">
+                          <view class="cont">
+                            <image class="image" src="/static/image/icon/gamereport.png" lazy="loaded"></image>
+                          </view>
+                          <text class="text">竞猜报表</text>
+                        </view>
+                      </view>
+                      <view class="chat-form-buttons-list-line">
+                        <view class="chat-form-buttons-list-li">
+                          <view class="cont">
+                            <image class="image" src="/static/image/icon/balancerecordbtn.png" lazy="loaded"></image>
+                          </view>
+                          <text class="text">积分帐变</text>
+                        </view>
+                        <view class="chat-form-buttons-list-li">
+                          <view class="cont">
+                            <image class="image" src="/static/image/icon/backwaterbtn.png" lazy="loaded"></image>
+                          </view>
+                          <text class="text">自助回水</text>
+                        </view>
+                        <view class="chat-form-buttons-list-li">
+                          <view class="cont">
+                            <image class="image" src="/static/image/icon/fulireportbtn.png" lazy="loaded"></image>
+                          </view>
+                          <text class="text">福利报表</text>
+                        </view>
+                        <view class="chat-form-buttons-list-li">
+                          <view class="cont">
+                            <image class="image" src="/static/image/icon/redbabtn.png" lazy="loaded"></image>
+                          </view>
+                          <text class="text">红包报表</text>
+                        </view>
+                      </view>
+                      <view class="chat-form-buttons-list-line">
+                        <view class="chat-form-buttons-list-li">
+                          <view class="cont">
+                            <image class="image" src="/static/image/icon/agentreportbtn.png" lazy="loaded"></image>
+                          </view>
+                          <text class="text">代理报表</text>
+                        </view>
+                        <view class="chat-form-buttons-list-li"></view>
+                        <view class="chat-form-buttons-list-li"></view>
+                        <view class="chat-form-buttons-list-li"></view>
+                      </view>
+                    </view>
+                  </view>
+                </cell>
+            </list>
+          </view>
+        </swiper-item>
+        <swiper-item v-if="utype == 0">
+          <view class="bet-content">
+            <view class="odds-box">
+              <view class="left-tab">
+                <view class="van-sidebar">
+                  <view v-for="(item,index) in quickPlayDetailData" class="van-sidebar-item" :class="{ 'van-sidebar-item-select': tabclassIndex === index }" @click="tabsel(index)">
+                    <text class="text">{{ item.name }}</text>
+                  </view>
+                </view>
+                <view class="returnicon key" @click="switchSwiper">
+                  <image class="image" src="/static/image/icon/qunliaobtn.png" lazy="loaded"></image>
+                </view>
+              </view>
+              <list class="right-content" :class="template.toLowerCase()">
+                <cell v-for="(item,index) in quickPlayDetailData">
+                  <view v-if="tabclassIndex  === index && index == 0" class="quick" :style="{'width':(windowWidth-heightArr.leftFiexdWidth)+'px'}">
+                    <view class="quick-header">
+                      <block v-for="(it,i) in item['list']" :key="i">
+                        <text class="button" :disabled="curtime.fp == 1" :class="{ 'classActive': selectedButtons.includes(it.f),'lockedStatus':curtime.fp == 1}" @click="toggleSelection(it.f)">{{ it.name }}</text>
+                      </block>
+                    </view>
+                    <view class="oddsgroup top">
+                      <view :style="{'width':heightArr.righWidthItem+'px'}" class="odds" :class="{ 'checked': selectedPlays.includes(pitem.f),'lockedStatus':curtime.fp == 1}" v-for="(pitem,pindex) in item['list'][0]['plist']" :disabled="curtime.fp == 1" @click="togglePlay(pitem.f)">
+                          <view v-if="pitem.isn === 0" class="oddname"><text class="span1 text">{{ pitem.name }}</text></view>
+                          <view v-if="pitem.isn === 1 && template == 'PK10'">
+                            <image class="scball" :src="'/static/opennum/ball-'+pitem.name+'.png'"></image>
+                          </view>
+                          <view v-if="pitem.isn === 1 && template == 'SSC'" class="ball" :class="'ball-'+pitem.name">
+                            <text class="text">{{ pitem.name }}</text>
+                          </view>
+                          <text v-if="curtime.fp == 0" class="odd text">{{ pitem.odds }}</text>
+                          <view v-if="curtime.fp == 1" class="lockedodd">--</view>
+                          <image v-if="curtime.fp == 0" class="selected" style="height: 40rpx;width: 40rpx;" src="/static/img/odds-select.png"></image>
+                        </view>
+                    </view>
+                  </view>
+                  <view v-if="tabclassIndex == index && index !== 0" :style="{'width':(windowWidth-heightArr.leftFiexdWidth)+'px'}">
+                    <view v-for="(it,i) in item['list']">
+                      <view style="flex-direction: row;background-color: #f9f9f9;padding:25rpx 20rpx;" @click="doClp(index,i)">
+                        <view style="flex:1;align-items:center;justify-content:center;">
+                          <text style="color: #323233;font-size: 30rpx;">{{it.name}}</text>
+                        </view>
+                        <u-icon size="16" color="#969799" name="arrow-up"></u-icon>
+                      </view>
+                      <view class="oddsgroup" :style="{'width':windowWidth-heightArr.leftFiexdWidth+'px'}">
+                        <view :style="{'width':heightArr.righWidthItem+'px'}" :class="{ 'checked': selectedPlays.includes(it.f+'-'+pitem.f),'lockedStatus':curtime.fp == 1}" @tap="togglePlay(it.f+'-'+pitem.f)" class="odds" v-for="(pitem,pindex) in it['plist']">
+                          <view v-if="pitem.isn === 0" class="oddname"><text class="span1 text">{{ pitem.name }}</text></view>
+                          <view v-if="pitem.isn === 1 && template == 'PK10'">
+                            <image class="scball" :src="'/static/opennum/ball-'+pitem.name+'.png'" :lazy-load="true"></image>
+                          </view>
+                          <view v-if="pitem.isn === 1 && template == 'SSC'" class="ball" :class="'ball-'+pitem.name">
+                            <text class="text">{{ pitem.name }}</text>
+                          </view>
+                          <text v-if="curtime.fp == 0" class="odd text">{{ pitem.odds }}</text>
+                          <view v-if="curtime.fp == 1" class="lockedodd">--</view>
+                          <image v-if="curtime.fp == 0" class="selected" style="height: 40rpx;width: 40rpx;" src="/static/img/odds-select.png"></image>
+                        </view>
+                      </view>
+                    </view>
+                  </view>
+                </cell>
+              </list>
+            </view>
+            <view class="bet-footer">
+              <view class="footer-btns">
+                <u-button :disabled="curtime.fp == 1" type="success" class="button" @click="selectMoney(item)" v-for="item in moneyList" :text="item"></u-button>
+              </view>
+              <view class="footer-text">
+                <text class="text">下注总额：</text>
+                <text class="red-text text">{{ zje }}</text>
+                <text class="span text">共{{ zCount }}注单</text>
+              </view>
+              <view class="footer-content">
+                <view class="van-cell van-field">
+                    <u--input border="none" v-model="betMoney" type="number" placeholder="请输入下注金额" class="control"></u--input>
+                </view>
+                <u-button :disabled="curtime.fp == 1" type="success" :customStyle="{color:'#fff'}" @click="bet()" class="betbtn button" text="下注"></u-button>
+                <u-button :disabled="curtime.fp == 1" type="error" @click="betReset()" class="resetbtn button" text="重置"></u-button>
+              </view>
+            </view>
+          </view>
+        </swiper-item>
+      </swiper>
+    </z-paging-swiper>
+    <u-action-sheet @select="selectAction" :actions="actionlist" :closeOnClickOverlay="true" :safeAreaInsetBottom="true" @close="isShowAction = false" :closeOnClickAction="true" title="" :show="isShowAction"></u-action-sheet>
+    <u-popup :show="isShowSwitchPannel" mode="right" :closeOnClickOverlay="true" @close="isShowSwitchPannel = !isShowSwitchPannel" :safeAreaInsetTop="true">
+      <list>
+        <cell @click="gotoSwitchGame(item)" class="game-switch-item" v-for="(item,index) in gTimeList">
+          <view class="logo">
+            <image class="image" :src="'/static/glogo1/'+item.gid+'.png'" lazy="loaded"></image>
+          </view>
+          <view class="lottery-name">
+            <text class="p1 text">{{ item.gname }}</text>
+            <text class="p2 text">{{ item.period }}期</text>
+          </view>
+          <view class="status">
+            <view class="status-1">
+              <text class="fpz-word text" v-if="item.stopstatus == 0 && item.fp == 1">封盘中...</text>
+              <text class="fpz-word text" v-if="item.stopstatus == 1">未开盘</text>
+              <text class="jfp-word text" v-if="item.stopstatus == 0 && item.fp == 0">距离封盘</text>
+            </view>
+            <view class="status-2" v-if="item.stopstatus == 0 && item.fp == 0">
+              <view>
+                <view class="flip-down vue-countdown-component theme5">
+                  <text class="time-box text">{{ item.timearr[0] }}</text>
+                  <text class="time-box text">{{ item.timearr[1] }}</text>
+                  <text class="time-unit text">:</text>
+                  <text class="time-box text">{{ item.timearr[2] }}</text>
+                  <text class="time-box text">{{ item.timearr[3] }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </cell>
+      </list>
+    </u-popup>
+    <u-popup :show="msgOrderDetailShow" mode="center" round="8" :customStyle="{'width':(windowObj.windowWidth-50)+'px'}" :closeOnClickOverlay="true" @close="msgOrderDetailShow = !msgOrderDetailShow">
+      <view class="h-table">
+        <text class="msgOrderDetailTitle">注单详情</text>
+        <view class="h-tr">
+          <text class="h-th">位置</text>
+          <text class="h-th">号码</text>
+          <text class="h-th">金额</text>
+          <text class="h-th" v-if="orderShowTtype == 'settle'">盈亏</text>
+        </view>
+      </view>
+      <list style="height: 600rpx">
+        <cell>
+          <view class="h-table">
+            <view class="h-tr" v-for="it in msgOrderList">
+              <view class="h-td"><text class="text">{{ it.b }}</text></view>
+              <view class="h-td"><text class="text">{{ it.p }}</text></view>
+              <view class="h-td"><text class="text">{{ it.a }}</text></view>
+              <view class="h-td" v-if="orderShowTtype == 'settle'">
+                <text class="text" v-if="it.y > 0" style="color: green;">+{{ it.y }}</text>
+                <text class="text" v-if="it.y < 0" style="color: red;">{{ it.y }}</text>
+                <text class="text" v-if="it.y == 0">{{ it.y }}</text>
+              </view>
+            </view>
+          </view>
+        </cell>
+      </list>
+    </u-popup>
+  </view>
+</template>
+
+<script>
+import u from "@/uni_modules/z-paging/components/z-paging/js/z-paging-utils";
+const weexDom = uni.requireNativePlugin("dom");
+import htmlParser from '@/utils/htmlParser.js';
+import {siteConfig} from "../libs/mixin/mixin";
+export default {
+  mixins: [uni.$mymixin],
+  data() {
+    return {
+      gid: 0, uid: 0, utype: 0,
+      avatar: uni.getStorageSync('avatar'),
+      headImageDomain: '',
+      openImageDomain: '',
+      chatList: [],
+      cellStyle: {},
+      template: '',
+      previewImageFlag: false,
+      swiperCurrent: 0,
+      curtime:[],//当前开盘时间信息
+      roomConfig:[],
+      balanceInfo:[],//余额信息
+      gTimeList:[],
+      unreadCount:0,//未读消息
+      emojiType:'',
+      isAtBottom:false,
+      windowHeight:0,//当前屏幕高度
+      windowWidth:0,//当前屏幕宽度
+      periodtimer:null,
+      balancetimer:null,
+      isShowOpenList:false,//是否显示开奖列表
+      openresultlist:[],//
+      isshowpredict:false,//预测
+      predictInfoList:[],//预测数据
+      topPanelShow:false,//顶部面板显示
+      isclshow:false,//长龙
+      cllist:[],//长龙数据
+      heightArr:{kbHeight:0,btnsHeight:0,topHeight:0,bottomHeight:0,keyHeight:0,betBottomHeight:0,leftFiexdWidth:80,righWidthItem:0},
+      ismsgfocus:false,
+      sendmsg:'',
+      iskeyshow:false,
+      isbuttonsshow:false,
+      keyboardHeight:0,
+      isshowssckey:false,
+      betRecordShow:false,//
+      periodOrderList:[],//
+      isshowright:false,
+      coicon1:true,//是否显示悬浮按钮
+      isShowSwitchPannel:false,//游戏切换面板
+      isShowAction:false,
+      actionlist:[{name:'复制',code:'copy'},{name:'跟投',code:'follow'}],
+      actionIndex:0,
+      tabclassIndex: 0,
+      quickPlayDetailData:[],
+      selectedButtons:[],
+      selectedPlays:[],
+      betMoney:'',
+      moneyList:[10,20,50,100,200],
+      zje:0,//总下注金额
+      zCount:0,//总下注数量
+      orderShowTtype:'',
+      msgOrderDetailShow:false,
+      msgOrderList:[],
+    }
+  },
+  onReady() {
+    this.initTopHeight();
+  },
+  onShow(){
+    //console.log("chatGame onShow")
+    if(this.previewImageFlag){
+      this.previewImageFlag = false;
+      return;
+    }
+    if(!this.periodtimer){
+      this.getperiod();
+      this.getRoomConfig();
+      this.utype == 0 && this.quickPlayDetail();
+      this.periodtimer = setInterval(() => {this.timerCheck();this.gitemTimeCheck();},1000);
+    }
+    if(!this.balancetimer){
+      this.balancetimer = setInterval(() => {
+        if(uni.$socketUtils.isOpenSocket){
+          uni.$socketUtils.send({eventType:"getBalanceInfo"});
+          uni.$socketUtils.send({eventType:"periodListOrSingle"});
+          this.getRoomConfig();
+        }
+      },8000);
+    }
+  },
+  onHide(){
+    //console.log("chatGame onHide")
+    clearInterval(this.periodtimer);this.periodtimer = null;
+    clearInterval(this.balancetimer);this.balancetimer = null;
+  },
+  beforeDestroy(){
+    //console.log("chatGame beforeDestroy")
+    clearInterval(this.periodtimer);this.periodtimer = null;
+    clearInterval(this.balancetimer);this.balancetimer = null;
+  },
+  onLoad() {
+    this.headImageDomain = uni.getStorageSync('headImageDomain');
+    this.openImageDomain = uni.getStorageSync('openImageDomain');
+    let that = this;
+    this.uid = this.userInfo.userid;
+    this.utype = this.userInfo.type;
+    this.gid = uni.getStorageSync('cgid');
+    this.template = uni.getStorageSync('ctemplate');
+    this.windowHeight = this.windowObj.windowHeight;
+    this.windowWidth = this.windowObj.windowWidth;
+    this.heightArr.righWidthItem = (this.windowWidth-this.heightArr.leftFiexdWidth)/2;
+    //清理监听器
+    uni.$off('websocketopen');
+    uni.$off('openResult'+this.gid);
+    uni.$off('gamechat'+this.gid);
+    uni.$off('getBalanceInfo');
+    uni.$off('roomStatusNotice');
+    uni.$off('periodListOrSingle');
+    //初始化远程数据
+    this.getRoomConfig();
+    this.utype == 0 && this.quickPlayDetail();
+    console.log(this.template);
+    if(this.template == 'SSC'){
+      this.keyboardHeight = 290;
+      this.isshowssckey = true;
+    }else{
+      this.isshowssckey = false;
+      this.keyboardHeight = 210;
+    }
+    //连接成功发送查询单期开奖结果
+    if(!uni.$socketUtils.isOpenSocket){
+      uni.$on('websocketopen', function(res) {//websocket连接成功发送查询单期开奖结果
+        uni.$socketUtils.send({eventType:"openResult",gid:that.gid});
+        uni.$socketUtils.send({eventType:"getBalanceInfo"});
+        uni.$socketUtils.send({eventType:"periodListOrSingle"});
+        that.getperiod();
+      });
+    }else{
+      uni.$socketUtils.send({eventType:"openResult",gid:that.gid});
+      uni.$socketUtils.send({eventType:"getBalanceInfo"});
+      uni.$socketUtils.send({eventType:"periodListOrSingle"});
+    }
+    if(!uni.$socketUtils.isOpenSocket){uni.$socketUtils.initConnection();}
+    //当期开奖结果
+    uni.$on('openResult'+this.gid, function(data) {
+      that.openResult = data.data;
+    });
+    //监听聊天消息
+    uni.$on('gamechat'+this.gid, function(data) {
+      let msg = data.data;
+      let isBottom = false;
+      if (!that.isAtBottom) {
+        if(Array.isArray(msg)){
+          that.unreadCount += msg.length;
+        }else{
+          that.unreadCount += 1;
+        }
+        if(that.tmpToButomFlag){
+          isBottom = true;
+        }
+      }else{
+        isBottom = true;
+      }
+      if(Array.isArray(msg)){
+        this.$nextTick(function (){
+          that.chatList = that.chatList.concat(msg);
+          that.tmpToButomFlag = false;
+        });
+      }else{
+        if(data.other.msgid && msg.sender == that.uid){
+          for (let i = 0; i < that.chatList.length; i++) {
+            let oitem = that.chatList[i];
+            if(data.other.msgid === oitem.msgid){
+              that.chatList[i].nickname = msg.nickname;
+              break;
+            }
+          }
+          uni.setStorageSync('sendmsg',that.sendmsg);
+          that.sendmsg = "";
+          !data.other.openResult && uni.$socketUtils.send({eventType:"getBalanceInfo"});
+        }else{
+          this.$nextTick(function (){that.chatList.push(msg);that.tmpToButomFlag = false;});
+        }
+      }
+      if(isBottom){
+        u.delay(()=>{that.toBottom()},300)
+      }
+      if(data.other.openResult && data.other.openResult == 1){
+        uni.$socketUtils.send({eventType:"openResult",gid:that.gid});
+        setTimeout(function (){
+          uni.$socketUtils.send({eventType:"getBalanceInfo"});
+        },1000);
+      }
+      if(data.other.getBalanceInfo && data.other.getBalanceInfo == 1){
+        uni.$socketUtils.send({eventType:"getBalanceInfo"});
+      }
+    });
+    //获取余额信息
+    uni.$on('getBalanceInfo', function(data) {
+      that.balanceInfo = data.data;
+    });
+    uni.$on('roomStatusNotice', function(data) {
+      that.balanceInfo.room_status = data.data.room_status;
+    });
+    //监听所有彩种时间
+    uni.$on('periodListOrSingle', function(res) {
+      let gid = res.gid;
+      if (gid && gid > 0) {
+        for (let i = 0; i < that.gTimeList.length; i++) {
+          if (that.gTimeList[i].gid == gid) {
+            let cgame = that.gTimeList[i];
+            let ngame = res.data[0];
+            that.$set(that.gTimeList[i],'stopstatus', ngame.stopstatus);
+            if(cgame.period !== ngame.period){
+              that.$set(that.gTimeList[i],'period', ngame.period);
+              that.$set(that.gTimeList[i],'djs', ngame.djs);
+              that.$set(that.gTimeList[i],'fp', ngame.fp);
+              that.$set(that.gTimeList[i],'nowSaleTime', ngame.nowSaleTime);
+              that.$set(that.gTimeList[i],'nowSealTime', ngame.nowSealTime);
+              that.$set(that.gTimeList[i],'nowOpenTime', ngame.nowOpenTime);
+            }
+            break;
+          }
+        }
+      } else {
+        if(that.gTimeList.length <= 0 || that.gTimeList.length !== res.data.length){
+          that.$set(that, 'gTimeList', res.data);
+          return;
+        }
+        for (let i = 0; i < that.gTimeList.length; i++) {
+          let cgame = that.gTimeList[i];
+          let ngame = res.data[i];
+          that.$set(that.gTimeList[i],'stopstatus', ngame.stopstatus);
+          if(cgame.period !== ngame.period){
+            that.$set(that.gTimeList[i],'period', ngame.period);
+            that.$set(that.gTimeList[i],'djs', ngame.djs);
+            that.$set(that.gTimeList[i],'fp', ngame.fp);
+            that.$set(that.gTimeList[i],'nowSaleTime', ngame.nowSaleTime);
+            that.$set(that.gTimeList[i],'nowSealTime', ngame.nowSealTime);
+            that.$set(that.gTimeList[i],'nowOpenTime', ngame.nowOpenTime);
+          }
+        }
+      }
+    });
+
+    //键盘高度监听
+    uni.offKeyboardHeightChange(this.keyboardHeightChange);
+    uni.onKeyboardHeightChange(this.keyboardHeightChange);
+  },
+  computed: {
+    windowObj() {
+      return uni.$u.sys();
+    }
+  },
+  mounted() {
+    this.$nextTick(()=>{
+      this.loadChatRecords();
+    });
+  },
+  watch: {
+    betMoney(newVal){
+      newVal = newVal+"";
+      if (newVal.includes('.')) {
+        newVal = newVal.replace('.', '');
+      }
+      // 使用正则表达式检查是否以0开头并且不是单独的0
+      if (/^0?[0-9]+$/.test(newVal)) {
+        // 如果以0开头且不是单独的0，则过滤掉以0开头的部分
+        newVal = newVal.replace(/^0+/, '');
+      }
+      newVal = newVal.replace(/[^\d]/g, '');
+      newVal = newVal <= 0 ? '' : newVal;
+      this.betMoney = newVal;
+      this.completeMoney();
+    },
+    selectedButtons(){
+      this.completeMoney();
+    },
+    selectedPlays(){
+      this.completeMoney();
+    },
+    'balanceInfo.room_status': {
+      handler: function (val, oldVal) {
+        if(val == 2){
+          this.sendmsg = "";
+        }
+      },
+      deep: true
+    }
+  },
+  methods: {
+    siteConfig() {
+      return siteConfig
+    },
+    customerTo(){
+      let url = "copage/custChat";
+      if(this.utype == 1){
+        url = "agent/nearchat/nearchat";
+      }
+      uni.$utils.jump(url);
+    },
+    doClp(index,ind){
+      /*let ref = this.$refs['collect-'+index+'-'+ind];
+      console.log("index="+index,ref,this.$refs[ref]);
+      this.$nextTick(() => {
+        weexDom.getComponentRect(ref, option => {
+          console.log("ssssssssssss",option)
+          if (option && option.result && option.size) {
+            console.log(option.size);
+          }
+        })
+      });*/
+    },
+    msgOrderDetail(item,orderShowTtype){
+      this.orderShowTtype = orderShowTtype;
+      this.msgOrderDetailShow = true;
+      this.msgOrderList = item;
+    },
+    gotoSwitchGame(item){
+      console.log(`🎮 切换游戏: ${this.gid} -> ${item.gid}`);
+      
+      // 立即清理当前页面的定时器和监听器，防止资源泄漏
+      clearInterval(this.periodtimer);
+      clearInterval(this.balancetimer);
+      this.periodtimer = null;
+      this.balancetimer = null;
+      
+      // 清理WebSocket监听器
+      uni.$off('websocketopen');
+      uni.$off('openResult'+this.gid);
+      uni.$off('gamechat'+this.gid);
+      uni.$off('getBalanceInfo');
+      uni.$off('roomStatusNotice');
+      uni.$off('periodListOrSingle');
+      
+      console.log(`✅ 已清理当前游戏(${this.gid})的定时器和WebSocket监听器`);
+      
+      uni.setStorageSync('cgid', item.gid);
+      uni.setStorageSync('ctemplate', item.template);
+      uni.$utils.jump('copage/chat',"redirectTo");
+    },
+    bet(){
+      if(this.balanceInfo.room_status == 2){
+        uni.showToast({title: "当前账号禁言中",icon: 'none'});
+        return;
+      }
+      let str = "";
+      if(this.tabclassIndex === 0){
+        if(this.selectedButtons.length <= 0 || this.selectedPlays.length <= 0){
+          uni.$utils.showToast('请选择玩法');
+          return;
+        }
+        this.selectedButtons.sort((a, b) => a - b);
+        let arr1 = this.selectedButtons.map(item => item + 1);
+        let str1 = arr1.join('');
+        let str2 = this.selectedPlays.join('');
+        let str3 = this.betMoney;
+        str = str1+"/"+str2+"/"+str3;
+        //console.log(arr1,this.selectedPlays)
+      }else{
+        if(this.selectedPlays.length <= 0){
+          uni.$utils.showToast('请选择玩法');
+          return;
+        }
+        //循环数组
+        //console.log(this.selectedPlays);
+        let parr = {};let garr = [];
+        this.selectedPlays.forEach((item,index)=>{
+          let tmparr = item.split('-');
+          let gname = tmparr[0];
+          let pname = tmparr[1];
+          //如果tmp中有该元素
+          if(!parr[gname]){
+            parr[gname] = [];
+          }
+          parr[gname].push(pname);
+        });
+        //console.log(parr);
+        let arr1 = [];
+        for (let key in parr) {
+          arr1.push(key+"/"+parr[key].join("")+"/"+this.betMoney);
+        }
+        arr1 = arr1.sort((a, b) =>  b - a);
+        str = arr1.join("#");
+        console.log(str);
+      }
+      //下注金额判断betMoney
+      if(isNaN(this.betMoney) || this.betMoney <= 0){
+        uni.$utils.showToast('请输入正确的下注金额');
+        return;
+      }
+      this.tmpToButomFlag = true;
+      uni.$socketUtils.send({eventType:"gamechat",gid:this.gid,content:str});
+      //uni.setStorageSync('sendmsg',str);
+      //uni.$socketUtils.send({eventType:"getBalanceInfo"});
+      this.selectedButtons = [];
+      this.selectedPlays = [];
+      uni.$utils.showToast('消息发送成功！');
+    },
+    completeMoney(){
+      let c = 0;
+      if(this.tabclassIndex === 0){
+        let c1 = this.selectedButtons.length;
+        let c2 = this.selectedPlays.length;
+        c = c1*c2;
+      }else{
+        c = this.selectedPlays.length;
+      }
+      if(c >= 0 && parseInt(this.betMoney) >= 0){
+        this.zje = c*this.betMoney;
+        this.zCount = c;
+      }
+    },
+    betReset(){
+      this.selectedButtons = [];
+      this.selectedPlays = [];
+      this.betMoney = '';
+      this.zje = 0;
+      this.zCount = 0;
+    },
+    selectMoney(money){
+      this.betMoney = money;
+      console.log(this.betMoney);
+      this.completeMoney();
+    },
+    toggleSelection(i) {
+      const index = this.selectedButtons.indexOf(i);
+      if (index === -1) {
+        this.selectedButtons.push(i); // 添加到选中数组
+      } else {
+        this.selectedButtons.splice(index, 1); // 从选中数组移除
+      }
+    },
+    togglePlay(playname) {
+      const index = this.selectedPlays.indexOf(playname);
+      if (index === -1) {
+        this.selectedPlays.push(playname); // 添加到选中数组
+      } else {
+        this.selectedPlays.splice(index, 1); // 从选中数组移除
+      }
+      //console.log(this.selectedPlays);
+    },
+    switchSwiper(){
+      this.swiperCurrent = 0;
+      this.toBottom();
+    },
+    tabsel(index) {
+      if(index !== this.tabclassIndex){
+        this.selectedButtons = [];
+        this.selectedPlays = [];
+      }
+      this.tabclassIndex = index;
+    },
+    selectAction(json){
+      let item = this.chatList[this.actionIndex];
+      let content = "";
+      if(Array.isArray(item.content)){
+        for(let c in item.content){
+          let con = item.content[c].con.replace(/<[^>]*>/g, '');
+          content += con;
+        }
+      }else{
+        content = item.content;
+      }
+      if(json.code === 'copy'){//复制
+        uni.setClipboardData({
+          data: content,
+          success: () => {
+            uni.showToast({ title: '复制成功', duration: 2000 });
+          },
+          fail: () => {
+            uni.showToast({ title: '复制失败', icon: 'none', duration: 2000 });
+          }
+        });
+      }else if(json.code === 'follow'){//跟投
+        if(content){
+          this.sendmsg = content;
+          this.sendevent();
+        }
+      }
+    },
+    onLongPress(e,index){
+      this.actionIndex = index;
+      this.isShowAction = true;
+    },
+    switchGame() {
+      this.isShowSwitchPannel = !this.isShowSwitchPannel
+    },
+    siteTo() {
+      plus.runtime.openURL(siteConfig.kjwurl)
+    },
+    betRecordTabChange(index){
+      if(index){
+        uni.showLoading({title: '加载中'});
+        let item = this.periodOrderList[index];
+        uni.$u.api.member.getLotterySettledList({gid:this.gid,period:item.period}).then(res => {
+          this.periodOrderList[index].orders = res.data;
+          uni.hideLoading();
+        }).catch(err => { uni.hideLoading();});
+      }
+    },
+    betRecordTop() {
+      this.isshowpredict = false;
+      this.isclshow = false;
+      this.isShowOpenList = false;
+      if(!this.betRecordShow){
+        uni.showLoading({title: '加载中'});
+        uni.$u.api.member.getBetsSumByLotteryId({gid:this.gid}).then(res => {
+          uni.hideLoading();
+          if(res.data.length <= 0){
+            uni.$u.toast("暂无数据");
+          }else{
+            this.periodOrderList = res.data;
+            this.betRecordShow = true;
+          }
+        });
+      }else{
+        this.betRecordShow = false;
+      }
+    },
+    longpressDel(){
+      this.sendmsg = "";
+    },
+    myonkey(name,iswy){
+      if(this.balanceInfo.room_status == 2){
+        uni.showToast({title: "当前账号禁言中",icon: 'none'});
+        return;
+      }
+      if(iswy == 1){
+        this.sendmsg = "";
+      }
+      if(name === "删"){
+        this.sendmsg = this.sendmsg.substring(0,this.sendmsg.length-1);
+        return;
+      }
+      if(name === "重复"){
+        this.sendmsg = uni.getStorageSync('sendmsg','');
+        return;
+      }
+      if(name === "闲聊"){
+        if(this.roomConfig.banChat == 1){
+          uni.showToast({title: "暂未开放闲聊，请联系管理员",icon: 'none'});
+          return;
+        }
+        /*this.$nextTick(() => {
+          this.ismsgfocus = true;
+        })*/
+        this.$refs.chatinput.focus();
+        return;
+      }
+      if(name === "/#"){
+        if(this.sendmsg){
+          let lastchar = this.sendmsg.charAt(this.sendmsg.length-1);
+          if(lastchar === "/"){
+            name = "#";
+            this.sendmsg = this.sendmsg.slice(0, -1);
+          }else if(lastchar === "#"){
+            name = "/";
+            this.sendmsg = this.sendmsg.slice(0, -1);
+          }else{
+            name = "/";
+          }
+        }else{
+          name = "/";
+        }
+      }
+      this.sendmsg += name;
+    },
+    initTopHeight() {
+      uni.$u.getRect('.chat-input-bar-container').then(res => {
+        this.heightArr.bottomHeight = res.height;
+      })
+    },
+    sendevent() {
+      if(this.sendmsg.length <= 0){
+        uni.$u.toast('消息不能为空');
+        return;
+      }
+      this.tmpToButomFlag = true;let msgid = uni.$u.guid(20);
+      let msgitem = {avatar:this.avatar,chatType:'text',content:this.sendmsg,nickname:'发送中',sender:this.uid,msgid:msgid};
+      this.chatList.push(msgitem);
+      this.toBottom();let that = this;
+      setTimeout(function (){
+        uni.$socketUtils.send({eventType:"gamechat",gid:that.gid,content:that.sendmsg,msgid:msgid});
+      },50);
+    },
+    emojiChange(field,nfield) {
+      if(this.utype == 1){
+        /*let that = this;
+        this.$nextTick(() => {
+          that.ismsgfocus = true;
+        });*/
+        this.$refs.chatinput.focus();
+        return;
+      }
+      if (this.emojiType === 'keyboard' || this.emojiType === 'mykeyboard') {
+        // 点击了键盘，展示键盘
+        //this.ismsgfocus = true;
+        uni.hideKeyboard();// 隐藏键盘
+        this.ismsgfocus = false;
+        this[field] = false;
+        this[nfield] = false;
+        this.emojiType = '';
+        this.heightArr.bottomHeight = this.heightArr.bottomHeight-this.heightArr.keyHeight;
+        this.heightArr.keyHeight = 0;
+      } else {
+        this[field] = true;
+        this[nfield] = false;
+        this.emojiType = 'mykeyboard';
+        this.heightArr.keyHeight = this.keyboardHeight;
+        this.heightArr.bottomHeight = this.heightArr.bottomHeight+this.heightArr.keyHeight;
+      }
+      this.toBottom(true);
+    },
+    tokjresult(){
+      uni.setStorageSync('backUrl','copage/chat');
+      uni.$utils.jump("copage/kjresult");
+    },
+    showOpenListClick() {
+      this.isshowpredict = false;
+      this.isclshow = false;
+      this.betRecordShow = false;
+      this.isShowOpenList = !this.isShowOpenList;
+      if(this.isShowOpenList){
+        uni.$u.api.common.resultByDate({gid:this.gid}).then(res => {this.openresultlist = res.data.records;});
+      }
+    },
+    dragonTop() {
+      this.isshowpredict = false;
+      this.isShowOpenList = false;
+      this.betRecordShow = false;
+      this.isclshow = !this.isclshow;
+      if(this.isclshow){
+        uni.$u.api.common.longdragon({gid:this.gid}).then(res => {this.cllist = res.data;});
+      }
+    },
+    predictTop() {
+      this.isclshow = false;
+      this.isShowOpenList = false;
+      this.betRecordShow = false;
+      this.isshowpredict = !this.isshowpredict;
+      if(this.isshowpredict){
+        uni.$u.api.common.lotteryPredictInfo({gid:this.gid}).then(res => {this.predictInfoList = res.data;});
+      }
+    },
+    toStr(text){
+      return text.replace(/<br>/gi, '\n');
+    },
+    parsehtml(text){
+      return htmlParser(text);
+    },
+    scroll(e){
+      const contentOffsetY = -e.contentOffset.y;
+      if(e.contentSize.height < contentOffsetY+this.windowHeight+50){
+        this.isAtBottom = true;
+        this.unreadCount = 0;
+      }else{
+        this.isAtBottom = false;
+      }
+    },
+    toBottom(fast = false){
+      let that = this;
+      this.$nextTick(() => {
+        u.delay(() => {
+          const el = that.$refs['h-list-bottom-tag'];
+          weexDom.scrollToElement(el, {
+            offset: 0,
+            animated: true
+          });
+        },100);
+        if(fast){
+          const el = that.$refs['h-list-bottom-tag'];
+          u.delay(() => {
+            weexDom.scrollToElement(el, {
+              offset: 0,
+              animated: false
+            });
+          },300);
+        }
+      });
+    },
+    quickPlayDetail(){
+      let that = this;
+      uni.$u.api.member.quickPlayDetail({gid:this.gid}).then(res => {that.quickPlayDetailData = res.data;}).catch(err => {});
+    },
+    getRoomConfig(){
+      let that = this;
+      uni.$u.api.common.getRoomConfig().then(res => {that.roomConfig = res.data;});
+    },
+    getperiod(){
+      let that = this;
+      uni.$u.api.common.getperiod({gid:this.gid}).then(res => {that.curtime = res.data;}).catch(err => {});
+    },
+    timerCheck(){
+      if(this.curtime.stopstatus === 1){
+        return;
+      }
+      this.curtime.djs -= 1;
+      this.curtime.kjdjs -= 1;
+      let fptime = this.curtime.djs;
+      let kptime = this.curtime.kjdjs;
+      if(fptime >= 0){
+        let minutes = Math.floor(fptime / 60);
+        let seconds = fptime % 60;
+        let timearr = [];
+        if(minutes < 10){
+          timearr[0] = 0;
+          timearr[1] = minutes;
+        }else{
+          timearr[0] = minutes.toString().split("")[0];
+          timearr[1] = minutes.toString().split("")[1];
+        }
+        if(seconds < 10){
+          timearr[2] = 0;
+          timearr[3] = seconds;
+        }else{
+          timearr[2] = seconds.toString().split("")[0];
+          timearr[3] = seconds.toString().split("")[1];
+        }
+        this.curtime.fp = 0;
+        this.curtime.timearr = timearr;
+        //console.log(fptime,minutes,seconds,this.gamelist[i].timearr)
+      }else if(fptime < 0 && this.curtime.kjdjs >= 0){
+        let minutes = Math.floor(kptime / 60);
+        let seconds = kptime % 60;
+        let timearr = [];
+        if(minutes < 10){
+          timearr[0] = 0;
+          timearr[1] = minutes;
+        }else{
+          timearr[0] = minutes.toString().split("")[0];
+          timearr[1] = minutes.toString().split("")[1];
+        }
+        if(seconds < 10){
+          timearr[2] = 0;
+          timearr[3] = seconds;
+        }else{
+          timearr[2] = seconds.toString().split("")[0];
+          timearr[3] = seconds.toString().split("")[1];
+        }
+        this.curtime.timearr = timearr;
+        this.curtime.fp = 1;
+      }else{
+        this.getperiod();
+      }
+    },
+    gitemTimeCheck(){
+      for (let i = 0; i < this.gTimeList.length; i++) {
+        let item = this.gTimeList[i];
+        if (item.stopstatus === 1) {
+          continue;
+        }
+        this.gTimeList[i].djs -= 1;
+        let fptime = item.djs;
+        if (fptime >= 0) {
+          let minutes = Math.floor(fptime / 60);
+          let seconds = fptime % 60;
+          let timearr = [];
+          if (minutes < 10) {
+            timearr[0] = 0;
+            timearr[1] = minutes;
+          } else {
+            timearr[0] = minutes.toString().split("")[0];
+            timearr[1] = minutes.toString().split("")[1];
+          }
+          if (seconds < 10) {
+            timearr[2] = 0;
+            timearr[3] = seconds;
+          } else {
+            timearr[2] = seconds.toString().split("")[0];
+            timearr[3] = seconds.toString().split("")[1];
+          }
+          this.gTimeList[i].fp = 0;
+          this.gTimeList[i].timearr = timearr;
+        } else if (fptime < 0 && Math.abs(fptime) < (item.nowOpenTime-item.nowSealTime)) {
+          this.gTimeList[i].fp = 1;
+        } else{
+          if(uni.$socketUtils.isOpenSocket){
+            uni.$socketUtils.send({eventType:"periodListOrSingle",gid:item.gid});
+          }
+        }
+      }
+    },
+    backTo() {
+      //#ifdef H5
+      uni.$utils.jump('pages/gamehall/gamehall');
+      //#endif
+      //#ifdef APP-PLUS
+      uni.$utils.jump(1,"navigateBack");
+      //#endif
+    },
+    onSwiperChange(e) {
+      this.swiperCurrent = e.detail.current;
+    },
+    clickImg(e) {
+      this.previewImageFlag = true;
+      var current = e.target.dataset.src
+      uni.previewImage({
+        urls: [current], //需要预览的图片http链接列表，多张的时候，url直接写在后面就行了
+        current: current, // 当前显示图片的http链接，默认是第一个
+        success: function (res) {
+        },
+        fail: function (res) {
+        },
+        complete: function (res) {
+        },
+      })
+    },
+    toImageUrl(url) {
+      return this.headImageDomain + url;
+    },
+    toConImageUrl(url) {
+      return this.openImageDomain + url;
+    },
+    loadChatRecords() {
+      const params = {page: 1,pageSize: 50};
+      params.gid = this.gid;let that = this;
+      uni.$u.api.common.chatRecords(params).then(res => {
+        this.chatList = res.data.list;
+        that.toBottom(true);
+      });
+      /*let msgitem = {avatar:this.avatar,chatType:'text',nickname:'群主',sender:111,'mtype':1};
+      msgitem.content = this.str;
+      this.chatList.push(msgitem);*/
+    },
+    keyboardHeightChange(res) {
+      if (res.height > 0) {
+        if(this.emojiType === 'mykeyboard'){
+          this.heightArr.bottomHeight = this.heightArr.bottomHeight-this.heightArr.keyHeight;
+          this.iskeyshow = false;
+          this.isbuttonsshow = false;
+        }
+        this.emojiType = 'keyboard';// 键盘展开
+        this.heightArr.keyHeight = res.height;
+        this.heightArr.bottomHeight = this.heightArr.bottomHeight+this.heightArr.keyHeight;
+      }else{
+        this.emojiType = '';
+        this.heightArr.bottomHeight = this.heightArr.bottomHeight-this.heightArr.keyHeight;
+        this.heightArr.keyHeight = res.height;
+      }
+      this.toBottom();
+    },
+    touchstart() {
+      uni.hideKeyboard();
+      this.emojiType = '';
+    }
+  }
+}
+</script>
+
+<style lang="scss" scoped>
+/* 注单详情 */
+.h-table{
+  .msgOrderDetailTitle{
+    height: 84rpx;
+    line-height: 84rpx;
+    margin-left: 20rpx;
+    font-size: 34rpx;
+  }
+  .h-tr{
+    flex-direction: row;
+    height: 60rpx;
+    flex:1;
+    justify-content: space-around;
+    border-bottom:1rpx solid #ccc;
+    .h-th{
+      flex:1;
+      font-weight: 700;
+      border-right:1rpx solid #ccc;
+      color: #000000;
+      width: 100rpx;
+      font-size: 30rpx;
+      background-color: rgb(227, 229, 241);
+      text-align: center;
+      line-height: 60rpx;
+    }
+    .h-td{
+      flex:1;
+      border-right:1rpx solid #ccc;
+      width: 100rpx;
+      align-items: center;
+      justify-content: center;
+      .text{
+        font-size: 30rpx;
+        text-align: center;
+        line-height: 60rpx;
+        color: #000000;
+      }
+    }
+  }
+}
+
+/* 第二个sipwer */
+.bet-content {
+  flex:1;
+  background-color: #f1f1f1;
+  .odds-box {
+    flex-direction: row;
+    border-top: 1rpx solid #ddd;
+    flex:1;
+    .left-tab {
+      width: 80px;
+      background-color: #ededed;
+      border-right: 1rpx solid #ddd;
+      display: flex;
+      flex-direction: column;
+      .van-sidebar {
+        flex: 1;
+        .van-sidebar-item {
+          background-color: #ededed;
+          height: 94rpx;
+          border-bottom: 1rpx solid #ddd;
+          justify-content: center;
+          align-items: center;
+        }
+        .van-sidebar-item-select {
+          background-color: #0087b4;
+          .text {
+            color: #fff !important;
+            font-weight: 500 !important;
+          }
+        }
+        .text {
+          color: #323233;
+          font-size: 28rpx;
+        }
+      }
+      .returnicon {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        margin-bottom: 10rpx;
+        .image {
+          width: 100rpx;
+          height: 100rpx;
+          border-radius: 100rpx;
+        }
+      }
+    }
+    .right-content {
+      background-color: #fff;
+      .quick {
+        display: flex;
+        flex-direction: column;
+        margin-top: 4rpx;
+        .quick-header {
+          flex-direction: row;
+          flex-wrap: wrap;
+          justify-content: space-around;
+          .button {
+            width: 100rpx;
+            font-size: 24rpx;
+            color: #323233;
+            border: 2rpx solid #ebedf0;
+            padding: 20rpx 0px;
+            border-radius: 8rpx;
+            text-align: center;
+            margin-bottom: 4rpx;
+          }
+        }
+      }
+      .classActive{
+        background-color: #0087b4;
+        color:#fff !important;
+      }
+      .oddsgroup.top{
+        margin-top:5rpx;
+      }
+      .oddsgroup {
+        border-top: 2rpx solid #ddd;
+        flex-direction: row;
+        flex-wrap: wrap;
+        .lockedStatus{opacity: 0.5;}
+        flex:1;
+        .odds {
+          background-color: #fff;
+          padding: 24rpx 8rpx;
+          border-bottom:2rpx solid #ddd;
+          border-right:2rpx solid #ddd;
+          flex-direction: row;
+          justify-content: center;
+          align-items: center;
+          .text{
+            font-size: 30rpx;
+          }
+          .scball {
+            width: 50rpx;
+            height: 50rpx;
+            margin-right: 22rpx;
+          }
+          .ball {
+            width: 50rpx;
+            height: 50rpx;
+            margin-right: 22rpx;
+            border-radius: 50%;
+            justify-content: center;
+            align-items: center;
+            border: 6rpx solid;
+            .text{
+              font-size: 24rpx;
+              font-weight: 700;
+            }
+          }
+          .odd {
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: center;
+            color: red;
+          }
+          .oddname {
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-end;
+            align-items: center;
+            font-weight: 500;
+            color: #000;
+            .span1 {
+              font-size: 28rpx;
+              margin-right: 8rpx;
+            }
+          }
+        }
+        .odds .selected{
+          position: absolute;
+          right: 0;
+          bottom: 0;
+          /*border: 4rpx solid #0087b4;*/
+          opacity: 0;
+        }
+        .odds.checked .selected{
+          opacity: 1;
+        }
+      }
+    }
+  }
+  .bet-footer {
+    background-color: #fff;
+    padding: 16rpx 10rpx;
+    border-top:1px solid #ddd;
+    .footer-btns {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-around;
+      .button {
+        height: 25px;
+        background-color: #0087b4;
+        border:1px solid #0087b4;
+        color: #fff;
+        font-size: 28rpx;
+        border-radius: 8rpx;
+      }
+      .text{
+        color: #fff;
+        font-size: 28rpx;
+      }
+    }
+    .footer-content {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      padding-right: 20rpx;
+      .van-cell {
+        flex-direction: row;
+        flex:1;
+        padding: 10rpx 17rpx;
+        color: #323233;
+        line-height: 21rpx;
+        background-color: #fff;
+      }
+      .van-field {
+        background-color: #ededed;
+        flex: 1;
+        height: 30px;
+        font-size: 14px;
+        border-radius: 8px;
+        padding-left: 20px;
+      }
+      .text{
+        font-size: 14px;
+      }
+      .betbtn {
+        margin: 0 18rpx;
+        background-color: #0087b4;
+        color: #fff;
+        font-size: 14px;
+        border:1px solid #0087b4;
+      }
+      .button{
+        padding: 0 17px;
+        height: 30px;
+        line-height: 40px;
+      }
+      .resetbtn{
+        color: #fff;
+        font-size: 14px;
+        background-color: #fe0101;
+      }
+    }
+    .footer-text {
+      .text{
+        font-size: 28rpx;
+      }
+      display: flex;
+      flex-direction: row;
+      margin: 12rpx;
+      .red-text{color: red;}
+      .span{margin-left: 48rpx;}
+    }
+  }
+}
+
+/**游戏列表倒计时面板css**/
+.game-switch-item{
+  display: flex;
+  flex-direction: row;
+  padding: 0 20rpx;
+  border-bottom: 1rpx solid #e5e5e5;
+  height: 150rpx;
+  align-items: center;
+  background-color: #fff;
+  .logo {
+    width: 100rpx;
+    height: 100rpx;
+  }
+  .text{
+    font-size: 26rpx;
+  }
+  .lottery-name {
+    margin-left: 10rpx;
+    flex: 1;
+    .p1{
+      font-size: 30rpx;
+      color: #000;
+      font-weight: bold;
+    }
+    .p2{
+      color: grey;
+      font-size: 28rpx;
+      padding-top: 6rpx;
+    }
+  }
+  .logo .image {
+    width: 100rpx;
+    height: 100rpx;
+  }
+  .status {
+    text-align: right;
+    padding-right: 4rpx;
+    .status-1 {
+      font-size: 26rpx;
+      color: #000;
+      .fpz-word{
+        color: #ff4a4a;
+      }
+      .jfp-word{
+        color: #000;
+      }
+    }
+    .status-2 {
+      font-size: 24rpx;
+      color: grey;
+      padding-top: 12rpx;
+      text-align: center;
+      .vue-countdown-component {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        .time-box {
+          height: 40rpx;
+          text-align: center;
+          line-height: 40rpx;
+          color: #888;
+          font-size: 26rpx;
+        }
+        .time-unit {
+          text-align: center;
+          color: #888;
+          font-size: 26rpx;
+          font-weight: 700;
+        }
+      }
+    }
+  }
+}
+
+/* 悬浮按钮 */
+.coIcon {
+  position: absolute;
+  z-index: 0;
+  right: 30rpx;
+  top: 30rpx;
+  .span1 {
+    width: 80rpx;
+    height: 80rpx;
+    background: #0087b4;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 32rpx;
+    position: relative;
+  }
+  .image {
+    width: 50rpx;
+    height: 50rpx;
+  }
+}
+.right-icon {
+  position: absolute;
+  top: 120rpx;
+  display: flex;
+  flex-direction: column;
+  right: 30rpx;
+  .span1 {
+    width: 80rpx;
+    height: 80rpx;
+    background: #0087b4;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8rpx;
+    position: relative;
+    .image {
+      width: 50rpx;
+      height: 50rpx;
+    }
+  }
+}
+
+/* 注单列表 */
+.bet-history-box{
+  transition-property: height;
+  transition-duration: 0.15s;
+  .text.red{color: #fe0101;}
+  .text.green{color: #00d123;}
+  .text.blue{color: #0087b4;}
+  .bet-list-item {
+    height: 101rpx; /* 1.333333rem */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 30rpx; /* 0.4rem */
+    .item-up{
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      .strong{
+        font-size: 29rpx;
+        color: #5b5b5b;
+        font-weight: bold;
+      }
+      .text{
+        font-size: 28rpx;
+      }
+    }
+    .item-down{
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      padding-top: 6rpx;
+      .text{
+        color: #828282;
+        font-size: 24rpx;
+      }
+    }
+  }
+  .bet-detail{
+    .bet-item{
+      flex-direction: row;
+      height: 81rpx;
+      align-items: center;
+      padding: 0 30rpx;
+      background-color: #f5f5f5;
+      border-bottom: 2rpx solid #e6e6e6;
+      .left{
+        font-weight: 600 !important;
+        flex: 2;
+        text-align: left;
+        color: #5b5b5b;
+      }
+      .time{
+        flex: 1;
+        text-align: left;
+        color: #828282;
+      }
+      .text{
+        font-size: 28rpx;
+        font-weight: 500;
+      }
+      .status{
+        flex: 1;
+        text-align: right;
+      }
+    }
+  }
+}
+
+/* 底部 */
+.chat-input-bar-container{
+  .chat-input-bar {
+    flex-direction: row;
+    align-items: center;
+    border-top: solid 1px #f5f5f5;
+    background-color: #f8f8f8;
+    padding: 10rpx 20rpx;
+    .key-board{
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      height: 90rpx;
+      padding-right: 20rpx;
+      .image{
+        width: 60rpx;
+        height: 60rpx;
+      }
+    }
+    .chat-input-container {
+      flex: 1;
+      background-color: #fff;
+      border-radius: 10rpx;
+      .chat-input {
+        flex: 1;
+        font-size: 30rpx;
+        height: 80rpx;
+        padding:8rpx;
+      }
+    }
+    .chat-input-send {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      padding-left: 20rpx;
+      .image{
+        width: 54rpx;
+        height: 54rpx;
+      }
+    }
+  }
+  .emoji-panel-container {
+    background-color: #f8f8f8;
+    transition-property: height;
+    transition-duration: 0.15s;
+    .text{
+      font-size: 14px;
+    }
+    .key-board-ul-li:active{ background-color: #f0f2f8;}
+    .key-board{
+      padding: 4px 4px 4px 4px;
+      background-color: #f0f2f8;
+      z-index: 9999;
+      .nav_1 {
+        background-color: #fff;
+        margin-bottom: 3px;
+        flex-direction: row;
+        align-items: center;
+        flex: 1;
+        .key-board-ul-li{
+          height: 40px;
+          border-right: 1px solid #eee;
+          align-items: center;
+          justify-content: center;
+          flex: 1;
+        }
+      }
+      .nav_2 {
+        flex-direction: column;
+        flex: 1;
+        .nav_2-line{
+          flex-direction: row;
+          flex: 1;
+          .key-board-ul-li {
+            height: 40px;
+            background-color: #fff;
+            border-radius: 4px;
+            border-right: 4px solid #f0f2f8;
+            border-bottom: 4px solid #f0f2f8;
+            flex: 1;
+            align-items: center;
+            justify-content: center;
+          }
+        }
+      }
+      .nav_pcdd {
+        display: flex;
+        flex-wrap: wrap;
+        .key-board-ul-li {
+          text-align: center;
+          width: 25%;
+          padding: 16rpx 0;
+          background-color: #fff;
+          border-right: 8rpx solid #f0f2f8;
+          border-bottom: 8rpx solid #f0f2f8;
+          border-radius: 20rpx;
+        }
+        .key-board-ul-li:active{ background-color: #f0f2f8;}
+      }
+      .key-board-content {
+        display: flex;
+        flex-direction: row;
+        .nav_3 {
+          flex: 1;
+          .key-board-ul-li {
+            background-color: #fff;
+            border-radius: 4px;
+            border-right: 4px solid #f0f2f8;
+            border-bottom: 4px solid #f0f2f8;
+            height: 40px;
+            justify-content: center;
+            align-items: center;
+          }
+        }
+        .nav_4 {
+          flex-wrap: wrap;
+          flex: 4;
+          .nav_4-line{
+            flex-direction: row;
+          }
+          .key-board-ul-li.taking {background-color: #ccc;color: #fff}
+          .key-board-ul-li {
+            flex: 1;
+            background-color: #fff;
+            border-radius: 4px;
+            border-right: 4px solid #f0f2f8;
+            border-bottom: 4px solid #f0f2f8;
+            height: 40px;
+            justify-content: center;
+            align-items: center;
+          }
+        }
+      }
+    }
+    .chat-form-buttons{
+      background: #f6f6f6;
+      flex:1;
+      .chat-form-buttons-list {
+        .chat-form-buttons-list-line{
+          justify-content: space-around;
+          flex-direction: row;
+        }
+        .chat-form-buttons-list-li {
+          margin-top: 16rpx;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex:1;
+          .cont {
+            width: 128rpx;
+            height: 128rpx;
+            border-radius: 16rpx;
+            background-color: #fff;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+          }
+          .image {
+            width: 44rpx;
+            height: 44rpx;
+          }
+          .text {
+            font-size: 28rpx;
+            text-align: center;
+            color: #7b7b7b;
+            padding-top: 8rpx;
+          }
+        }
+      }
+    }
+  }
+}
+
+/* 开奖号码列表 */
+.open-num-list-pk10 {
+  background-color: #fff;
+  transition-property: height;
+  transition-duration: 0.15s;
+  .open-num-head {
+    flex-direction: row;
+    border-bottom: 2rpx solid #e6e6e6;
+    align-items: center;
+    border-bottom: 1rpx solid #e6e6e6;
+    height: 30px;
+    .open-num-title{
+      display: flex;
+      flex-direction: row;
+      justify-content: flex-start;
+      align-items: center;
+      .scnumList{
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-around;
+        .numList{
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: space-around;
+        }
+        .text {
+          font-size: 24rpx;
+          color: #646464;
+          margin-right: 4rpx;
+          width: 36rpx;
+          font-weight: 400;
+          text-align: center;
+        }
+        .gyhe {
+          font-size: 24rpx;
+          width: 80rpx;
+          margin-left: 5rpx;
+          text-align: right;
+        }
+        .lh {
+          font-size: 24rpx;
+          margin-left: 10rpx;
+        }
+      }
+      .sscnumList{
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-around;
+        .numList {
+          flex-direction: row;
+          padding: 0 16rpx;
+        }
+        .text {
+          font-size: 24rpx;
+          color: #646464;
+          margin-right: 4rpx;
+          width: 50rpx;
+          font-weight: 400;
+          text-align: center;
+        }
+        .kjjg {
+          font-size: 24rpx;
+          color: #646464;
+          margin-right: 4rpx;
+          font-weight: 400;
+          text-align: center;
+        }
+        .sscSum{
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          margin-left: 10rpx;
+          font-size: 13px;
+        }
+      }
+    }
+    .period {
+      color: #646464;
+      font-size: 24rpx;
+      text-align: center;
+      width: 40px;
+      margin: 0 8px;
+    }
+  }
+  .open-num-data {
+    .item-list-cell{
+      height: 50rpx;
+      border-bottom: 2rpx solid #e6e6e6;
+      align-items: center;
+      justify-content: flex-start;
+      flex-direction: row;
+      .period {
+        text-align: center;
+        color: #646464;
+        width: 40px;
+        font-size: 24rpx;
+        margin: 0 8px;
+      }
+      .open-number{
+        flex-direction: row;
+        .num-left{
+          flex-direction: row;
+          .num-left-image{
+            width: 36rpx;
+            height: 36rpx;
+            margin-right: 4rpx;
+            border-radius: 4rpx;
+          }
+        }
+        .first-sum {
+          flex-direction: row;
+          .text{
+            line-height: 32rpx;
+            text-align: right;
+            font-size: 24rpx;
+          }
+          .first {
+            margin-left: 5rpx;
+            width: 80rpx;
+            flex-direction: row;
+            justify-content: flex-end;
+          }
+          .two{
+            flex-direction: row;
+            margin-left: 10rpx;
+          }
+          .red {
+            color: #fe0101;
+          }
+        }
+        .ssc-ball{
+          width: 40rpx;
+          height: 40rpx;
+          border-radius: 50%;
+          justify-content: center;
+          align-items: center;
+          border: 2px solid;
+          margin-right: 9px;
+          .text{
+            font-size: 12px;
+            font-weight: 700;
+          }
+        }
+        .sscSum {
+          flex-direction: row;
+          justify-content: center;
+          align-items: center;
+          .text{
+            font-size: 28rpx;
+          }
+        }
+      }
+    }
+  }
+  .btn {
+    border-top: 2rpx solid #e6e6e6;
+    padding: 6rpx 0;
+    align-items: center;
+    justify-content: center;
+    &-item {
+      background: #0087b4;
+      border-radius: 10rpx;
+      border: none;
+      width: 270rpx;
+      height: 50rpx;
+      .text{
+        font-size: 24rpx;
+        color: #fff;
+      }
+    }
+  }
+}
+.open-num-list-ssc {
+  background-color: #fff;
+  transition-property: height;
+  transition-duration: 0.15s;
+  .open-num-head {
+    flex-direction: row;
+    border-bottom: 2rpx solid #e6e6e6;
+    align-items: center;
+    border-bottom: 1rpx solid #e6e6e6;
+    height: 30px;
+    .open-num-title{
+      display: flex;
+      flex-direction: row;
+      justify-content: flex-start;
+      align-items: center;
+      .sscnumList{
+        flex-direction: row;
+        align-items: center;
+        .numList {
+          flex-direction: row;
+          .text {
+            font-size: 28rpx;
+            color: #646464;
+            margin-right: 4rpx;
+            width: 54rpx;
+            font-weight: 400;
+            text-align: center;
+          }
+        }
+        .kjjg {
+          font-size: 28rpx;
+          color: #646464;
+          margin-left: 20rpx;
+          font-weight: 400;
+        }
+      }
+    }
+    .period {
+      color: #646464;
+      font-size: 28rpx;
+      text-align: center;
+      width: 40px;
+      margin: 0 8px;
+    }
+  }
+  .open-num-data {
+    .item-list-cell{
+      height: 70rpx;
+      border-bottom: 2rpx solid #e6e6e6;
+      align-items: center;
+      justify-content: flex-start;
+      flex-direction: row;
+      .period {
+        text-align: center;
+        color: #646464;
+        width: 40px;
+        font-size: 24rpx;
+        margin: 0 8px;
+      }
+      .open-number{
+        flex-direction: row;
+        .num-left{
+          flex-direction: row;
+        }
+        .ssc-ball{
+          width: 50rpx;
+          height: 50rpx;
+          border-radius: 50%;
+          align-items: center;
+          border: 2px solid;
+          margin-right: 4px;
+          .text{
+            font-size: 24rpx;
+            font-weight: 700;
+          }
+        }
+        .sscSum {
+          margin-left: 20rpx;
+          flex-direction: row;
+          justify-content: center;
+          align-items: center;
+          .text{
+            font-size: 28rpx;
+            color: #646464;
+          }
+        }
+      }
+    }
+  }
+  .btn {
+    border-top: 2rpx solid #e6e6e6;
+    padding: 6rpx 0;
+    align-items: center;
+    justify-content: center;
+    &-item {
+      background: #0087b4;
+      border-radius: 10rpx;
+      border: none;
+      width: 270rpx;
+      height: 50rpx;
+      .text{
+        font-size: 24rpx;
+        color: #fff;
+      }
+    }
+  }
+}
+
+/* 长龙 */
+.changlong-box{
+  transition-property: height;
+  transition-duration: 0.15s;
+  background: #fff;
+  &-top{
+    flex-direction: row;
+  }
+  .van-col {
+    justify-content: center;
+    flex-direction: row;
+    align-items: center;
+    height: 33px;
+    line-height: 33px;
+    border-bottom: 1px solid #e6e6e6;
+    flex: 1;
+    .text{
+      font-size: 14px;
+      color:#646566;
+    }
+  }
+  .long-detail{
+    &-item{
+      flex-direction: row;
+    }
+  }
+}
+
+/* 预测 */
+.predict-box{
+  transition-property: height;
+  transition-duration: 0.15s;
+  background: #fff;
+  &-top{
+    flex-direction: row;
+  }
+  .long-detail{
+    &-item{
+      flex-direction: row;
+    }
+  }
+  .van-col {
+    display: flex;
+    justify-content: center;
+    flex-direction: row;
+    align-items: center;
+    flex: 1;
+    height: 28px;
+    border-bottom: 0.5px solid #e6e6e6;
+    .text{
+      font-size: 14px;
+      color:#646566;
+    }
+  }
+  .van-col.right-border {
+    border-right: 1rpx solid #e6e6e6;
+  }
+  .big-single {
+    border-radius: 7rpx;
+    height: 48rpx;
+    line-height: 48rpx;
+    width: 48rpx;
+    font-size: 28rpx;
+    text-align: center;
+    font-weight: 700;
+    color: #fff !important;
+  }
+}
+
+/**开奖倒计时，当期开奖结果css**/
+.time-unit {
+  padding: 0 8rpx;
+  color: #3293bc;
+  font-size: 30rpx;
+  font-weight: 700;
+  line-height: 50rpx;
+}
+.h-drop-down .time-box {
+  position: relative;
+  background-color: #0087b4;
+  border-radius: 6rpx;
+  padding: 6px 4px;
+  box-shadow: inset 3px 5px 20px #fff;
+  &-base {
+    font-weight: bold;
+    font-size: 12px;
+    text-align: center;
+    position: relative;
+  }
+}
+.word1 {
+  color: red;
+  font-size: 12px;
+}
+.drowbtns{
+  align-items: center;
+  flex-direction: row;
+  &-live-button {
+    margin-right: 14rpx;
+    height: 52rpx;
+    width: 52rpx;
+  }
+  &-btn {
+    margin-right: 14rpx;
+    background: #0087b4;
+    border-radius: 10rpx;
+    color: #fff;
+    width: 86rpx;
+    height: 50rpx;
+    line-height: 50rpx;
+    font-size: 28rpx;
+    text-align: center;
+  }
+}
+.pk10{
+  flex-direction: row;
+  align-items: center;
+  &-ball {
+    margin-right: 4rpx;
+    border-radius: 4rpx;
+    flex-direction: row;
+    width: 40rpx;
+    height: 40rpx;
+    &-image{
+      width: 40rpx;
+      height: 40rpx;
+    }
+  }
+  &-sum {
+    line-height: 32rpx;
+    text-align: right;
+    margin-left: 10rpx;
+    flex-direction: column;
+    &-title{
+      font-size: 24rpx;
+    }
+    &-wrap {
+      margin-top: 6rpx;
+      flex-direction: row;
+      &-text {
+        font-size: 24rpx;
+      }
+    }
+  }
+}
+.ssc{
+  flex-direction: row;
+  align-items: center;
+  &-ball {
+    width: 50rpx;
+    height: 50rpx;
+    border-radius: 50%;
+    justify-content: center;
+    align-items: center;
+    border: 3px solid;
+    margin-right: 9px;
+    .text{
+      font-size: 14px;
+      font-weight: 700;
+    }
+  }
+  &-sum {
+    margin-left: 10rpx;
+    flex-direction: row;
+    .text{
+      font-size: 30rpx;
+    }
+  }
+}
+.h-drop-down {
+  font-size: 28rpx;
+  background-color: #fff;
+  &-item {
+    flex-direction: row;
+    height: 84rpx;
+    border-bottom: 2rpx solid #e6e6e6;
+    align-items: center;
+    justify-content: flex-start;
+    &-period {
+      text-align: center;
+      color: #646464;
+      width: 40px;
+      font-size: 24rpx;
+      margin: 0 8px;
+    }
+    &-wating {
+      flex: 1;
+      justify-content: space-between;
+      align-items: center;
+      flex-direction: row;
+      &-time{
+        &-box{
+          flex-direction: row;
+          justify-content: flex-end;
+        }
+      }
+    }
+    &-opened{
+      flex-direction: row;
+    }
+    .drop-down-arrow {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex: 1;
+    }
+    .ssc{
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 0 8px;
+      .drop-down-list-item-ul-li {
+        width: 25px;
+        height: 25px;
+        font-size: 14px;
+        border-radius: 50%;
+        font-weight: 700;
+        justify-content: center;
+        display: flex;
+        align-items: center;
+        border: 3px solid;
+        margin-right: 9px;
+      }
+    }
+  }
+}
+
+/**悬浮按钮**/
+.h-floatbtn {
+  position: absolute;
+  z-index: 100;
+  right: 15px;
+  bottom: 170rpx;
+  &-image{
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+  }
+  &-unread-message {
+    position: absolute;
+    right: 0;
+    background-color: red;
+    height: 40rpx;
+    width: 40rpx;
+    border-radius: 50%;
+    font-size: 20rpx;
+    color: #fff;
+    text-align: center;
+    line-height: 40rpx;
+  }
+}
+
+/**头部css**/
+.h-bg {
+  background-image:linear-gradient(to right,#08bbc2,#144988);
+}
+.h-bar {
+  position: relative;
+  height: 100rpx;
+  align-items: center;
+  flex-direction: row;
+  &-left {
+    padding: 0 16rpx;
+    flex-direction: row;
+    align-items: center;
+    &-title {
+      margin-right: 16rpx;
+      flex-direction: row;
+      align-items: center;
+      color: #fff;
+      font-weight: 500;
+      font-size: 38rpx;
+    }
+  }
+  &-right {
+    flex-direction: row;
+    align-items: center;
+    flex: 1;
+    height: 100rpx;
+    justify-content: flex-end;
+    &-item {
+      flex-direction: column;
+      margin-right: 20rpx;
+      &-con {
+        flex-direction: row;
+        align-items: center;
+        height: 50rpx;
+        &-text {
+          font-size: 28rpx;
+          color: #fff;
+          text-overflow: ellipsis;
+          overflow: hidden;
+          margin-right: 10rpx;
+          margin-left: 6rpx;
+        }
+      }
+    }
+  }
+}
+
+.h-blue{color: #0087b4 !important;}
+.h-green {color: #00d123 !important;}
+.h-red {color: #ff193c !important;}
+.h-white {color: #fff !important;}
+
+.swiper {flex: 1;background-color: #f1f1f1;}
+
+/**聊天内容部分**/
+.chat-item {
+  display: flex;
+  flex-direction: column;
+  padding: 20rpx;
+}
+.chat-time {
+  padding: 4rpx 0rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: #aaaaaa;
+}
+.chat-container {
+  display: flex;
+  flex-direction: row;
+}
+.chat-location-me {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.chat-icon-container {
+  margin-top: 12rpx;
+}
+.chat-icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background-color: #fff;
+}
+.chat-content-container {
+  margin: 0rpx 15rpx;
+}
+.chat-user-name {
+  font-size: 26rpx;
+  color: #888888;
+}
+.chat-text-container {
+  background-color: #fff;
+  border-radius: 8rpx;
+  padding: 19rpx;
+  margin-top: 10rpx;
+}
+.name {
+  color: #0087b4;
+}
+.name1 {
+  color: #00d123;;
+}
+.blue {
+  color: #0087b4;
+}
+.chat-text-container-me {
+  background-color: #0087b4;
+  .ch-text{
+    font-size: 30rpx;
+    font-weight: 600;
+    color: #fff;
+  }
+}
+.chat-text-container-super {
+  flex-direction: row;
+  .ch-text{
+    font-size: 30rpx;
+    font-weight: 600;
+  }
+}
+.chat-imgae {
+  border-radius: 8rpx;
+  padding: 10rpx 0px;
+  margin-top: 10rpx;
+}
+</style>

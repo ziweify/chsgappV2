@@ -1,0 +1,68 @@
+<view class="bet-content" v-show="swiperCurrent === 1">
+            <view class="bet-box">
+              <view class="odds-box">
+                <view class="left-tab">
+                  <view class="van-sidebar">
+                    <view v-for="(item,index) in quickPlayDetailData" :key="index" class="van-sidebar-item" :class="{ 'van-sidebar-item--select': tabclassIndex === index }" @click="tabsel(index)">
+                      <view class="van-sidebar-item__text">{{ item.name }}</view>
+                    </view>
+                  </view>
+                  <view class="returnicon key" @click="switchSwiper">
+                    <image src="/static/image/icon/qunliaobtn.png" lazy="loaded"></image>
+                  </view>
+                </view>
+                <view class="chat-list chat-list-wrap" :style="{'height':(windowObj.windowHeight-heightArr.topHeight-heightArr.betBottomHeight)+'px'}">
+                  <template v-for="(item,index) in quickPlayDetailData">
+                    <view v-show="tabclassIndex == index" class="right-content" :class="template.toLowerCase()" v-if="index === 0" :key="`content-${index}`">
+                      <view class="odds-group-box">
+                        <view class="quick">
+                          <view class="quick-header">
+                            <button :disabled="curtime.fp == 1" :class="{ 'classActive': selectedButtons.includes(it.f),'lockedStatus':curtime.fp == 1}" @tap="toggleSelection(it.f)" v-for="it in item['list']" :key="it.f || it.name" size="mini">{{ it.name }}</button>
+                          </view>
+                          <view id="quickcomponent" class="quick-content">
+                            <view class="oddsgroup two">
+                              <view :disabled="curtime.fp == 1" :class="{ 'checked': selectedPlays.includes(pitem.f),'lockedStatus':curtime.fp == 1}" @tap="togglePlay(pitem.f)" class="odds" v-for="pitem in item['list'][0]['plist']" :key="pitem.f || pitem.name">
+                                <view v-if="pitem.isn === 0" class="oddname"><view class="span1">{{ pitem.name }}</view></view>
+                                <view v-if="pitem.isn === 1 && template == 'PK10'" class="oddimg"><view> <view class="ball" :class="'ball-'+pitem.name"></view></view></view>
+                                <view v-if="pitem.isn === 1 && template == 'SSC'" class="oddimg"><view> <view class="sscball" :class="'ball-'+pitem.name">{{ pitem.name }}</view></view></view>
+                                <view v-if="curtime.fp == 0" class="odd"><view>{{ pitem.odds }}</view></view>
+                                <view v-if="curtime.fp == 1" class="lockedodd">--</view>
+                                <view v-if="curtime.fp == 0" class="selected"></view>
+                              </view>
+                            </view>
+                          </view>
+                        </view>
+                      </view>
+                    </view>
+                    <view v-show="tabclassIndex == index" class="right-content" :class="template.toLowerCase()" v-if="index !== 0" :key="`content-alt-${index}`">
+                      <!-- 自定义折叠组件 -->
+                      <view class="custom-collapse">
+                        <view v-for="(it, collapseIndex) in item['list']" :key="it.f || collapseIndex" class="custom-collapse-item">
+                          <!-- 折叠标题栏 -->
+                          <view class="collapse-header" @click="toggleCollapseItem(tabclassIndex, collapseIndex)">
+                            <view class="collapse-title">{{ it.name }}</view>
+                            <view class="collapse-arrow" :class="{ 'collapse-arrow-open': isCollapseOpen(tabclassIndex, collapseIndex) }">
+                              <u-icon name="arrow-down" size="24" color="#666"></u-icon>
+                            </view>
+                          </view>
+                          <!-- 折叠内容 -->
+                          <view v-show="isCollapseOpen(tabclassIndex, collapseIndex)" class="collapse-content">
+                            <view style="border-top: 0.5px solid #ddd;" class="oddsgroup two">
+                              <view :class="{ 'checked': selectedPlays.includes(it.f+'-'+pitem.f),'lockedStatus':curtime.fp == 1}" @tap="togglePlay(it.f+'-'+pitem.f)" class="odds" v-for="(pitem, pindex) in it['plist']" :key="pitem.f || pindex">
+                                <view v-if="pitem.isn === 0" class="oddname"><view class="span1">{{ pitem.name }}</view></view>
+                                <view v-if="pitem.isn === 1 && template == 'PK10'" class="oddimg"><view> <view class="ball" :class="'ball-'+pitem.name"></view></view></view>
+                                <view v-if="pitem.isn === 1 && template == 'SSC'" class="oddimg"><view> <view class="sscball" :class="'ball-'+pitem.name">{{ pitem.name }}</view></view></view>
+                                <view v-if="curtime.fp == 0" class="odd"><view>{{ pitem.odds }}</view></view>
+                                <view v-if="curtime.fp == 1" class="lockedodd">--</view>
+                                <view v-if="curtime.fp == 0" class="selected"></view>
+                              </view>
+                            </view>
+                          </view>
+                        </view>
+                      </view>
+                    </view>
+                  </template>
+                </view>
+              </view>
+            </view>
+          </view>
