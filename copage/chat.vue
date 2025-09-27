@@ -315,6 +315,9 @@
                 <view class="switch span1" @click="switchGame">
                   <image src="/static/image/icon/qiegame.png"></image>
                 </view>
+                <view class="fullscreen-panel span1" @click="showFullScreenPanel">
+                  <image src="/static/image/icon/customer.png"></image>
+                </view>
                 <view class="customer span1" @click="customerTo">
                   <image src="/static/image/icon/customer.png"></image>
                 </view>
@@ -486,6 +489,25 @@
           </view>
         </view>
       </u-popup>
+      
+      <!-- 全屏快捷导航面板 - 与switchGame相同方式，只是全屏显示 -->
+      <u-popup :show="isShowFullScreenPanel" mode="center" :closeOnClickOverlay="true" @close="isShowFullScreenPanel = !isShowFullScreenPanel" :safeAreaInsetTop="true" :customStyle="{'width':'100%','height':'100%'}">
+        <view class="fullscreen-panel-container">
+          <!-- 标题栏 -->
+          <view class="fullscreen-panel-header">
+            <view class="panel-title">快捷导航</view>
+            <view class="panel-close" @click="isShowFullScreenPanel = false">
+              <u-icon name="close" color="#fff" size="20"></u-icon>
+            </view>
+          </view>
+          
+          <!-- 内容区域 -->
+          <view class="fullscreen-panel-content">
+            <text>全屏快捷导航面板 - 空白页面</text>
+          </view>
+        </view>
+      </u-popup>
+      
       <u-popup :show="msgOrderDetailShow" mode="center" round="8" :customStyle="{'width':'90%'}" :closeOnClickOverlay="true" @close="msgOrderDetailShow = !msgOrderDetailShow">
         <view class="h-table">
           <text class="msgOrderDetailTitle">注单详情</text>
@@ -643,6 +665,7 @@ export default {
       lastScrollPosition: null, // 最后的滚动位置，用于恢复
       tabclassIndex: 0,
       isShowSwitchPannel: false,
+      isShowFullScreenPanel: false, // 新增：全屏快捷导航面板
       isshowright: true,
       isshowpredict: false,
       isclshow: false,
@@ -2606,6 +2629,9 @@ export default {
     switchGame() {
       this.isShowSwitchPannel = !this.isShowSwitchPannel
     },
+    showFullScreenPanel() {
+      this.isShowFullScreenPanel = !this.isShowFullScreenPanel
+    },
     msgOrderDetail(item,orderShowTtype){
       this.orderShowTtype = orderShowTtype;
       this.msgOrderDetailShow = true;
@@ -4141,4 +4167,55 @@ export default {
   }
 }
 
+/* 快捷导航按钮样式 - 绿色背景 */
+.fullscreen-panel.span1 {
+  background: #4CAF50 !important; /* 绿色背景 */
+  border-radius: 50%;
+}
+
+/* 全屏快捷导航面板样式 */
+.fullscreen-panel-container {
+  width: 100%;
+  height: 100%;
+  background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+}
+
+.fullscreen-panel-header {
+  height: 48rpx; /* 24*2 = 48rpx */
+  background: #007aff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 30rpx;
+  position: relative;
+  z-index: 999;
+}
+
+.panel-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #fff;
+}
+
+.panel-close {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.fullscreen-panel-content {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 32rpx;
+  color: #666;
+}
 </style>
