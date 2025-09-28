@@ -1,0 +1,1367 @@
+<template>
+  <view class="outbet-config-container" :class="{ 'popup-mode': isPopupMode }">
+    <z-paging ref="paging" v-model="list" :show-empty-view-reload="true" safe-area-inset-bottom @query="queryList" :default-page-size="20">
+      <template #top>
+        <!-- 只在非弹窗模式显示标题栏 -->
+        <TsCustom v-if="!isPopupMode" :backUrl="backUrl" :isBack="showBackButton" title="打单配置列表">
+          <block slot='right'>
+            <view @click="goToAddConfig()">添加配置</view>
+          </block>
+        </TsCustom>
+        
+        <!-- 弹窗模式下的顶部间距，避免遮挡父弹窗的标题栏 -->
+        <view v-if="isPopupMode" style="height: 20rpx;"></view>
+
+        <!-- 配置信息展示区域 -->
+        <view class="config-info-section">
+          <view class="config-info-card">
+            <view class="config-header-info">
+              <view class="config-title">
+                <text class="title-text">打单系统配置</text>
+                <view class="switch-status" :class="configInfo.outbet_switch == 1 ? 'switch-on' : 'switch-off'" @click="toggleSwitch">
+                  <text class="switch-icon">🔘</text>
+                  <text class="switch-text">{{ configInfo.outbet_switch == 1 ? '已开启' : '已关闭' }}</text>
+                  <text class="click-hint">点击切换</text>
+                </view>
+              </view>
+            </view>
+            
+            <view class="config-content">
+              <!-- 过期时间和价格信息 -->
+              <view class="config-item dual-layout">
+                <!-- 左侧：过期时间区域 -->
+                <view class="left-section">
+                  <view class="section-header">
+                    <view class="item-icon">📅</view>
+                    <text class="section-title">有效期</text>
+                  </view>
+                  <view class="time-content">
+                    <text class="time-text" :class="isExpired ? 'expired' : 'valid'">
+                      {{ formatExpiryTime() }}
+                    </text>
+                    <text v-if="!isExpired && remainingTimeText" class="remaining-days">
+                      {{ remainingTimeText }}
+                    </text>
+                  </view>
+                </view>
+                
+                <!-- 右侧：开通价格区域 -->
+                <view v-if="configInfo.outbet_money1 > 0 || configInfo.outbet_money2 > 0" class="right-section">
+                  <view class="section-header">
+                    <view class="item-icon">💰</view>
+                    <text class="section-title">开通价格</text>
+                  </view>
+                  <view class="price-content">
+                    <view v-if="configInfo.outbet_money1 > 0" class="price-item">
+                      <text class="price-label">一天</text>
+                      <text class="price-value">{{ configInfo.outbet_money1 }}百胜币</text>
+                    </view>
+                    <view v-if="configInfo.outbet_money2 > 0" class="price-item">
+                      <text class="price-label">一个月</text>
+                      <text class="price-value">{{ configInfo.outbet_money2 }}百胜币</text>
+                    </view>
+                  </view>
+                </view>
+              </view>
+              
+              <!-- 试用信息 -->
+              <view v-if="Number(configInfo.outbet_sy_count) > 0" class="config-item dual-layout">
+                <!-- 左侧：试用说明区域 -->
+                <view class="left-section">
+                  <view class="section-header">
+                    <view class="item-icon">⏰</view>
+                    <text class="section-title">试用说明</text>
+                  </view>
+                  <view class="trial-content">
+                    <text class="trial-info">
+                      每天可以试用{{ configInfo.outbet_sy_count }}次，每次可以试用{{ configInfo.outbet_sy_time }}分钟
+                    </text>
+                  </view>
+                </view>
+                
+                <!-- 右侧：操作按钮区域 -->
+                <view class="right-section">
+                  <view class="section-header">
+                    <view class="item-icon">🚀</view>
+                    <text class="section-title">快速操作</text>
+                  </view>
+                  <view class="trial-buttons">
+                    <view class="apply-btn trial-btn" @click="applyTrial">
+                      <text class="apply-text">🎯 申请试用</text>
+                    </view>
+                    <view class="apply-btn open-btn" @click="applyOpen(1)">
+                      <text class="apply-text">⚡ 开通一天</text>
+                    </view>
+                    <view class="apply-btn open-btn-month" @click="applyOpen(30)">
+                      <text class="apply-text">🔥 开通一个月</text>
+                    </view>
+                  </view>
+                </view>
+              </view>
+              
+              <!-- 功能说明 -->
+              <view class="config-item">
+                <view class="item-header">
+                  <view class="item-icon">📋</view>
+                  <text class="item-title">功能说明</text>
+                </view>
+                <view class="description-content">
+                  <text class="description-text">{{ configInfo.outbet_desc || '暂无说明' }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </template>
+
+      <!-- 配置列表 -->
+      <view class="config-list">
+        <view v-for="(item,index) in list" :key="index" class="config-item">
+          <!-- 配置头部 -->
+          <view class="config-header">
+            <view class="config-name">
+              <text class="name-text">{{ item.name }}</text>
+              <view class="status-badge" :class="item.enabled == 1 ? 'status-enabled' : 'status-disabled'">
+                {{ item.enabled == 1 ? '启用' : '禁用' }}
+              </view>
+            </view>
+            <view class="config-type">{{ getTypeLabel(item.type) }}</view>
+          </view>
+          
+          <!-- 配置详情 -->
+          <view class="config-details">
+            <view class="detail-row">
+              <text class="label">盘口账号：</text>
+              <text class="value">{{ item.username }}</text>
+            </view>
+            <view class="detail-row">
+              <text class="label">在线状态：</text>
+              <view class="online-status" :class="item.online == 1 ? 'online' : 'offline'">
+                {{ item.online == 1 ? '在线' : '离线' }}
+              </view>
+            </view>
+            <view class="detail-row">
+              <text class="label">余额/未结/盈亏：</text>
+              <text class="value account-info">
+                {{ item.balance || '0' }}/{{ item.unsettle || '0' }}/<text :class="getProfitClass(item.sy)">{{ item.sy || '0' }}</text>
+              </text>
+            </view>
+            <view class="detail-row" v-if="item.start_money > 0">
+              <text class="label">起飞金额：</text>
+              <text class="value">{{ item.start_money }}元</text>
+            </view>
+            <view class="detail-row" v-if="item.chai_money > 0">
+              <text class="label">大额分投：</text>
+              <text class="value">{{ item.chai_money }}元</text>
+            </view>
+            <view class="detail-row" v-if="item.gidsname">
+              <text class="label">游戏：</text>
+              <text class="value game-names">{{ item.gidsname }}</text>
+            </view>
+            <view class="detail-row" v-if="item.urls">
+              <text class="label">网址：</text>
+              <text class="value url-names">{{ item.urls }}</text>
+            </view>
+          </view>
+          
+          <!-- 操作按钮 -->
+          <view class="config-actions">
+            <u-button @click="viewConfig(item)" size="mini" type="info" plain>查看</u-button>
+            <u-button @click="editConfig(item)" size="mini" type="primary" plain>修改</u-button>
+            <u-button @click="toggleStatus(item)" size="mini" :type="item.enabled == 1 ? 'warning' : 'success'" plain>
+              {{ item.enabled == 1 ? '停用' : '启用' }}
+            </u-button>
+            <u-button @click="deleteConfig(item)" size="mini" type="error" plain>删除</u-button>
+          </view>
+        </view>
+      </view>
+    </z-paging>
+
+    <!-- 配置详情弹窗 -->
+    <u-popup :show="showDetailPopup" mode="bottom" height="600rpx" :border-radius="20" @close="showDetailPopup = false" :safe-area-inset-bottom="true">
+      <view class="detail-popup">
+        <view class="popup-header">
+          <view class="header-left">
+            <text @click="showDetailPopup = false" class="close-btn">关闭</text>
+          </view>
+          <view class="header-center">
+            <text class="popup-title">配置详情</text>
+            <text class="scroll-tip">上下滑动查看更多</text>
+          </view>
+          <view class="header-right">
+            <text @click="editCurrentConfig" class="edit-btn">编辑</text>
+          </view>
+        </view>
+        
+        <view class="detail-content">
+          <view class="detail-section">
+            <view class="section-title">基本信息</view>
+            <view class="detail-item">
+              <text class="item-label">配置名称</text>
+              <text class="item-value">{{ currentConfig.name }}</text>
+            </view>
+            <view class="detail-item">
+              <text class="item-label">盘口类型</text>
+              <text class="item-value">{{ getTypeLabel(currentConfig.type) }}</text>
+            </view>
+            <view class="detail-item">
+              <text class="item-label">盘口账号</text>
+              <text class="item-value">{{ currentConfig.username }}</text>
+            </view>
+            <view class="detail-item">
+              <text class="item-label">在线状态</text>
+              <view class="online-status" :class="currentConfig.online == 1 ? 'online' : 'offline'">
+                {{ currentConfig.online == 1 ? '在线' : '离线' }}
+              </view>
+            </view>
+            <view class="detail-item">
+              <text class="item-label">启用状态</text>
+              <view class="status-badge" :class="currentConfig.enabled == 1 ? 'status-enabled' : 'status-disabled'">
+                {{ currentConfig.enabled == 1 ? '启用' : '禁用' }}
+              </view>
+            </view>
+          </view>
+          
+          <view class="detail-section">
+            <view class="section-title">账户信息</view>
+            <view class="detail-item">
+              <text class="item-label">余额/未结/盈亏</text>
+              <text class="item-value account-info">
+                {{ currentConfig.balance || '0' }}/{{ currentConfig.unsettle || '0' }}/<text :class="getProfitClass(currentConfig.sy)">{{ currentConfig.sy || '0' }}</text>
+              </text>
+            </view>
+          </view>
+          
+          <view class="detail-section">
+            <view class="section-title">投注设置</view>
+            <view class="detail-item">
+              <text class="item-label">投注模式</text>
+              <text class="item-value">{{ getBetModeLabel(currentConfig.bet_mode) }}</text>
+            </view>
+            <view class="detail-item">
+              <text class="item-label">合并去重</text>
+              <text class="item-value">{{ currentConfig.is_hebing == 1 ? '是' : '否' }}</text>
+            </view>
+            <view class="detail-item" v-if="currentConfig.start_money > 0">
+              <text class="item-label">起飞金额</text>
+              <text class="item-value">{{ currentConfig.start_money }}元</text>
+            </view>
+            <view class="detail-item" v-if="currentConfig.chai_money > 0">
+              <text class="item-label">大额分投</text>
+              <text class="item-value">{{ currentConfig.chai_money }}元</text>
+            </view>
+          </view>
+          
+          <view class="detail-section" v-if="currentConfig.gidsname">
+            <view class="section-title">游戏设置</view>
+            <view class="detail-item">
+              <text class="item-label">打单游戏</text>
+              <text class="item-value">{{ currentConfig.gidsname }}</text>
+            </view>
+          </view>
+          
+          <view class="detail-section" v-if="currentConfig.zhidingusernames">
+            <view class="section-title">会员设置</view>
+            <view class="detail-item">
+              <text class="item-label">指定会员</text>
+              <text class="item-value">{{ currentConfig.zhidingusernames }}</text>
+            </view>
+          </view>
+          
+          <view class="detail-section" v-if="currentConfig.urls">
+            <view class="section-title">网址配置</view>
+            <view class="detail-item">
+              <text class="item-label">相关网址</text>
+              <text class="item-value url-text">{{ currentConfig.urls }}</text>
+            </view>
+          </view>
+          
+          <view class="detail-section">
+            <view class="section-title">时间信息</view>
+            <view class="detail-item" v-if="currentConfig.create_time">
+              <text class="item-label">创建时间</text>
+              <text class="item-value">{{ currentConfig.create_time }}</text>
+            </view>
+            <view class="detail-item" v-if="currentConfig.update_time">
+              <text class="item-label">更新时间</text>
+              <text class="item-value">{{ currentConfig.update_time }}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </u-popup>
+
+    <!-- 删除确认弹窗 -->
+    <u-modal confirm-text="确定删除" :show="showDeleteDialog" @confirm="confirmDelete" @cancel="showDeleteDialog = false" confirmColor="#ee0a24" :showCancelButton="true">
+      <view class="slot-content" style="padding:20rpx;">
+        <text>确定要删除配置「{{ toDeleteConfig.name }}」吗？</text>
+        <text style="color:#ee0a24;font-size:28rpx;margin-top:10rpx;display:block;">删除后无法恢复，请谨慎操作！</text>
+      </view>
+    </u-modal>
+
+    <!-- 试用申请确认弹窗 -->
+    <u-modal confirm-text="确定申请" :show="showTrialDialog" @confirm="confirmTrialApplication" @cancel="showTrialDialog = false" :showCancelButton="true">
+      <view class="slot-content" style="padding:20rpx;">
+        <text>确定要申请试用打单功能吗？</text>
+        <text style="color:#007aff;font-size:28rpx;margin-top:10rpx;display:block;">每次可试用{{ configInfo.outbet_sy_time || 30 }}分钟</text>
+      </view>
+    </u-modal>
+
+    <!-- 开通申请确认弹窗 -->
+    <u-modal confirm-text="确定开通" :show="showOpenDialog" @confirm="confirmOpenApplication" @cancel="showOpenDialog = false" :showCancelButton="true">
+      <view class="slot-content" style="padding:20rpx;">
+        <text>确定要开通{{ openDuration }}的打单功能吗？</text>
+        <text style="color:#ff6b35;font-size:28rpx;margin-top:10rpx;display:block;">费用：{{ openPrice || 0 }}百胜币</text>
+      </view>
+    </u-modal>
+  </view>
+</template>
+
+<script>
+export default {
+  name: 'OutbetConfigComponent',
+  mixins: [uni.$mymixin],
+  props: {
+    // 是否为弹窗模式
+    isPopupMode: {
+      type: Boolean,
+      default: false
+    },
+    // 返回URL
+    backUrl: {
+      type: String,
+      default: "agent/manage/outbetmanage"
+    }
+  },
+  data() {
+    return {
+      list: [],
+      showBackButton: true,
+      configInfo: {
+        outbet_switch: 0,
+        outbet_overtime: 0,
+        outbet_money1: 0,
+        outbet_money2: 0,
+        outbet_desc: '',
+        outbet_sy_count: 0,
+        outbet_sy_time: 0
+      },
+      isExpired: false,
+      remainingTimeText: '',
+      showDetailPopup: false,
+      currentConfig: {},
+      showDeleteDialog: false,
+      toDeleteConfig: {},
+      isProcessing: false,
+      showTrialDialog: false,
+      showOpenDialog: false,
+      openDuration: '',
+      openPrice: 0,
+      openDays: 1
+    }
+  },
+  mounted() {
+    console.log('🚀 OutbetConfigComponent 组件已挂载，弹窗模式:', this.isPopupMode);
+    this.getConfigInfo();
+    this.updateRemainingTime();
+    // 每分钟更新一次剩余时间
+    this.timeUpdateTimer = setInterval(() => {
+      this.updateRemainingTime();
+    }, 60000);
+  },
+  beforeDestroy() {
+    if (this.timeUpdateTimer) {
+      clearInterval(this.timeUpdateTimer);
+    }
+  },
+  methods: {
+    // 获取配置信息
+    getConfigInfo() {
+      console.log('📡 开始获取配置信息...');
+      this.$u.api.agent.getOutbetConfig().then(res => {
+        console.log('📡 配置信息响应:', res);
+        if (res.status === 200 || res.code === 1) {
+          this.configInfo = res.data || {};
+          console.log('✅ 配置信息已更新:', JSON.stringify(this.configInfo, null, 2));
+          console.log('🔍 试用信息检查:', {
+            outbet_sy_count: this.configInfo.outbet_sy_count,
+            outbet_sy_time: this.configInfo.outbet_sy_time,
+            showTrialSection: this.configInfo.outbet_sy_count > 0
+          });
+          this.updateRemainingTime();
+        } else {
+          console.warn('⚠️ 获取配置信息失败:', res.msg);
+        }
+      }).catch(err => {
+        console.error('❌ 获取配置信息出错:', err);
+        // 添加模拟数据用于测试
+        console.log('🧪 使用模拟数据进行测试');
+        this.configInfo = {
+          outbet_switch: 1,
+          outbet_endtime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          outbet_money1: 100,
+          outbet_money2: 2000,
+          outbet_desc: '这是一个功能强大的打单系统，支持多种投注模式和自动化操作。',
+          outbet_sy_count: 3,
+          outbet_sy_time: 30
+        };
+        this.updateRemainingTime();
+      });
+    },
+
+    // 查询列表
+    queryList(pageNo, pageSize) {
+      console.log('📡 开始查询配置列表...');
+      this.$u.api.agent.getOutbetList({
+        page: pageNo,
+        limit: pageSize
+      }).then(res => {
+        console.log('📡 配置列表响应:', res);
+        if (res.status === 200 || res.code === 1) {
+          // 处理不同的数据结构
+          let listData = [];
+          if (res.data?.records) {
+            // 如果有records字段，使用records数组
+            listData = res.data.records;
+          } else if (res.data?.data) {
+            // 如果有data字段，使用data
+            listData = res.data.data;
+          } else if (Array.isArray(res.data)) {
+            // 如果data本身就是数组
+            listData = res.data;
+          }
+          console.log('✅ 配置列表数据:', listData);
+          this.$refs.paging.complete(listData);
+        } else {
+          console.warn('⚠️ 获取配置列表失败:', res.msg);
+          this.$refs.paging.complete(false);
+        }
+      }).catch(err => {
+        console.error('❌ 获取配置列表出错:', err);
+        this.$refs.paging.complete(false);
+      });
+    },
+
+    // 切换开关
+    toggleSwitch() {
+      const action = this.configInfo.outbet_switch == 1 ? '关闭' : '开启';
+      uni.showModal({
+        title: '确认操作',
+        content: `确定要${action}打单总开关吗？`,
+        success: (res) => {
+          if (res.confirm) {
+            this.updateSwitch();
+          }
+        }
+      });
+    },
+
+    // 更新总开关状态
+    updateSwitch() {
+      uni.showLoading({title: '操作中...'});
+      const newStatus = this.configInfo.outbet_switch == 1 ? 0 : 1;
+      
+      this.$u.api.agent.updateOutbetSwitch({
+        outbet_switch: newStatus
+      }).then(res => {
+        uni.hideLoading();
+        if (res.status === 200 || res.code === 1) {
+          this.configInfo.outbet_switch = newStatus;
+          uni.showToast({
+            title: newStatus == 1 ? '已开启' : '已关闭',
+            icon: 'success'
+          });
+        } else {
+          uni.showToast({
+            title: res.msg || '操作失败',
+            icon: 'none'
+          });
+        }
+      }).catch(err => {
+        uni.hideLoading();
+        uni.showToast({
+          title: err.msg || '操作失败',
+          icon: 'none'
+        });
+      });
+    },
+
+    // 添加配置
+    goToAddConfig() {
+      if (this.isPopupMode) {
+        // 弹窗模式下触发事件
+        this.$emit('addConfig');
+      } else {
+        // 页面模式下直接跳转
+        uni.$utils.jump('/agent/manage/outbet/outbetadd');
+      }
+    },
+
+    // 查看配置
+    viewConfig(item) {
+      this.currentConfig = item;
+      this.showDetailPopup = true;
+    },
+
+    // 编辑配置
+    editConfig(item) {
+      if (this.isPopupMode) {
+        // 弹窗模式下触发事件
+        this.$emit('editConfig', item);
+      } else {
+        // 页面模式下直接跳转
+        uni.$utils.jump('/agent/manage/outbet/outbetadd?id=' + item.id);
+      }
+    },
+
+    // 编辑当前配置
+    editCurrentConfig() {
+      this.showDetailPopup = false;
+      this.editConfig(this.currentConfig);
+    },
+
+    // 切换状态
+    toggleStatus(item) {
+      const newStatus = item.enabled == 1 ? 0 : 1;
+      this.$u.api.agent.updateOutbetStatus({
+        id: item.id,
+        enabled: newStatus
+      }).then(res => {
+        if (res.status === 200 || res.code === 1) {
+          item.enabled = newStatus;
+          uni.showToast({
+            title: newStatus == 1 ? '已启用' : '已停用',
+            icon: 'success'
+          });
+        } else {
+          uni.showToast({
+            title: res.msg || '操作失败',
+            icon: 'none'
+          });
+        }
+      }).catch(err => {
+        uni.showToast({
+          title: err.msg || '操作失败',
+          icon: 'none'
+        });
+      });
+    },
+
+    // 删除配置
+    deleteConfig(item) {
+      this.toDeleteConfig = item;
+      this.showDeleteDialog = true;
+    },
+
+    // 确认删除
+    confirmDelete() {
+      this.$u.api.agent.delOutbet({
+        id: this.toDeleteConfig.id
+      }).then(res => {
+        if (res.status === 200 || res.code === 1) {
+          uni.showToast({
+            title: '删除成功',
+            icon: 'success'
+          });
+          this.$refs.paging.reload();
+        } else {
+          uni.showToast({
+            title: res.msg || '删除失败',
+            icon: 'none'
+          });
+        }
+        this.showDeleteDialog = false;
+      }).catch(err => {
+        uni.showToast({
+          title: err.msg || '删除失败',
+          icon: 'none'
+        });
+        this.showDeleteDialog = false;
+      });
+    },
+
+    // 申请试用
+    applyTrial() {
+      console.log('🎯 点击申请试用按钮');
+      console.log('📊 当前配置信息:', this.configInfo);
+      console.log('🔍 试用时间:', this.configInfo.outbet_sy_time);
+      
+      // 防止重复点击
+      if (this.isProcessing) {
+        console.log('⚠️ 正在处理中，忽略重复点击');
+        return;
+      }
+      
+      console.log('📱 显示试用确认弹窗...');
+      this.showTrialDialog = true;
+    },
+
+    // 确认试用申请
+    confirmTrialApplication() {
+      console.log('✅ 用户确认试用申请');
+      this.showTrialDialog = false;
+      this.submitTrialApplication();
+    },
+
+    // 提交试用申请
+    submitTrialApplication() {
+      console.log('🚀 开始提交试用申请');
+      this.isProcessing = true;
+      uni.showLoading({title: '申请中...'});
+      
+      this.$u.api.agent.applyOutbet({type: 1}).then(res => {
+        console.log('📡 申请响应:', res);
+        uni.hideLoading();
+        this.isProcessing = false;
+        
+        if (res.status === 200 || res.code === 1) {
+          console.log('✅ 申请成功');
+          // 使用原始代码的toast方法
+          if (this.$u && this.$u.toast) {
+            this.$u.toast('申请成功');
+          } else {
+            uni.showToast({
+              title: '申请成功',
+              icon: 'success'
+            });
+          }
+          this.getConfigInfo();
+        } else {
+          console.log('❌ 申请失败:', res.msg);
+          if (this.$u && this.$u.toast) {
+            this.$u.toast(res.msg || '申请失败');
+          } else {
+            uni.showToast({
+              title: res.msg || '申请失败',
+              icon: 'none'
+            });
+          }
+        }
+      }).catch(err => {
+        console.error('❌ 申请出错:', err);
+        uni.hideLoading();
+        this.isProcessing = false;
+        
+        if (this.$u && this.$u.toast) {
+          this.$u.toast(err.msg || '申请失败');
+        } else {
+          uni.showToast({
+            title: err.msg || '申请失败',
+            icon: 'none'
+          });
+        }
+      });
+    },
+
+    // 申请开通
+    applyOpen(days) {
+      console.log('🎯 点击申请开通按钮，天数:', days);
+      console.log('📊 当前配置信息:', this.configInfo);
+      
+      // 防止重复点击
+      if (this.isProcessing) {
+        console.log('⚠️ 正在处理中，忽略重复点击');
+        return;
+      }
+      
+      this.openDays = days;
+      this.openDuration = days === 1 ? '一天' : '一个月';
+      this.openPrice = days === 1 ? this.configInfo.outbet_money1 : this.configInfo.outbet_money2;
+      
+      console.log('📱 显示开通确认弹窗...');
+      this.showOpenDialog = true;
+    },
+
+    // 确认开通申请
+    confirmOpenApplication() {
+      console.log('✅ 用户确认开通申请');
+      this.showOpenDialog = false;
+      this.submitOpenApplication(this.openDays);
+    },
+
+    // 提交开通申请
+    submitOpenApplication(days) {
+      uni.showLoading({title: '开通中...'});
+      
+      this.$u.api.agent.applyOutbet({
+        type: 2,
+        days: days
+      }).then(res => {
+        uni.hideLoading();
+        if (res.status === 200 || res.code === 1) {
+          uni.showToast({
+            title: '开通成功',
+            icon: 'success'
+          });
+          this.getConfigInfo();
+        } else {
+          uni.showToast({
+            title: res.msg || '开通失败',
+            icon: 'none'
+          });
+        }
+      }).catch(err => {
+        uni.hideLoading();
+        uni.showToast({
+          title: err.msg || '开通失败',
+          icon: 'none'
+        });
+      });
+    },
+
+    // 获取类型标签
+    getTypeLabel(type) {
+      const typeMap = {
+        1: 'A类盘口',
+        2: 'B类盘口',
+        3: 'C类盘口'
+      };
+      return typeMap[type] || '未知类型';
+    },
+
+    // 获取投注模式标签
+    getBetModeLabel(mode) {
+      const modeMap = {
+        1: '普通模式',
+        2: '高级模式',
+        3: '专业模式'
+      };
+      return modeMap[mode] || '未知模式';
+    },
+
+    // 获取盈亏样式类
+    getProfitClass(profit) {
+      if (profit > 0) return 'profit-positive';
+      if (profit < 0) return 'profit-negative';
+      return 'profit-zero';
+    },
+
+    // 格式化过期时间
+    formatExpiryTime() {
+      // 如果过期时间为0，直接返回已过期
+      if (!this.configInfo.outbet_overtime || this.configInfo.outbet_overtime == 0) {
+        this.isExpired = true;
+        return '已过期';
+      }
+      
+      const currentTime = Math.floor(Date.now() / 1000);
+      if (currentTime >= this.configInfo.outbet_overtime) {
+        this.isExpired = true;
+        return '已过期';
+      }
+      
+      this.isExpired = false;
+      const date = new Date(this.configInfo.outbet_overtime * 1000);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      
+      return `${year}-${month}-${day} ${hours}:${minutes}`;
+    },
+
+    // 更新剩余时间
+    updateRemainingTime() {
+      if (!this.configInfo.outbet_overtime || this.configInfo.outbet_overtime == 0) {
+        this.remainingTimeText = '';
+        return;
+      }
+      
+      const currentTime = Math.floor(Date.now() / 1000);
+      const remainingSeconds = Math.max(0, this.configInfo.outbet_overtime - currentTime);
+      
+      if (remainingSeconds <= 0) {
+        this.isExpired = true;
+        this.remainingTimeText = '';
+        return;
+      }
+      
+      const days = Math.floor(remainingSeconds / (24 * 60 * 60));
+      const hours = Math.floor((remainingSeconds % (24 * 60 * 60)) / (60 * 60));
+      const minutes = Math.floor((remainingSeconds % (60 * 60)) / 60);
+      
+      if (days > 0) {
+        this.remainingTimeText = `还剩${days}天`;
+      } else if (hours > 0) {
+        if (minutes > 0) {
+          this.remainingTimeText = `还剩${hours}小时${minutes}分钟`;
+        } else {
+          this.remainingTimeText = `还剩${hours}小时`;
+        }
+      } else if (minutes > 0) {
+        this.remainingTimeText = `还剩${minutes}分钟`;
+      } else {
+        this.remainingTimeText = '即将过期';
+      }
+    }
+  }
+}
+</script>
+
+<style lang="scss" scoped>
+.outbet-config-container {
+  height: 100%;
+  background: #f5f5f5;
+  
+  // 弹窗模式下的样式调整
+  &.popup-mode {
+    height: auto;
+    min-height: calc(100% - 60rpx); // 减去父弹窗标题栏高度
+    
+    // 确保z-paging组件不会超出弹窗范围
+    ::v-deep .z-paging {
+      height: auto !important;
+      max-height: calc(100vh - 120rpx); // 减去标题栏和一些边距
+    }
+  }
+}
+
+// 配置信息区域样式
+.config-info-section {
+  padding: 20rpx;
+  background: #f5f5f5;
+  
+  .config-info-card {
+    background: white;
+    border-radius: 16rpx;
+    overflow: hidden;
+    box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+    
+    .config-header-info {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 30rpx;
+      color: white;
+      
+      .config-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        
+        .title-text {
+          font-size: 36rpx;
+          font-weight: bold;
+        }
+        
+        .switch-status {
+          display: flex;
+          align-items: center;
+          padding: 12rpx 20rpx;
+          border-radius: 50rpx;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          
+          &.switch-on {
+            background: rgba(76, 175, 80, 0.2);
+            border: 2rpx solid #4CAF50;
+          }
+          
+          &.switch-off {
+            background: rgba(244, 67, 54, 0.2);
+            border: 2rpx solid #f44336;
+          }
+          
+          .switch-icon {
+            font-size: 24rpx;
+            margin-right: 8rpx;
+          }
+          
+          .switch-text {
+            font-size: 24rpx;
+            font-weight: bold;
+            margin-right: 8rpx;
+          }
+          
+          .click-hint {
+            font-size: 20rpx;
+            opacity: 0.8;
+          }
+        }
+      }
+    }
+    
+    .config-content {
+      padding: 30rpx;
+      
+      .config-item {
+        margin-bottom: 30rpx;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+        
+        &.dual-layout {
+          display: flex;
+          gap: 30rpx;
+        }
+        
+        .left-section, .right-section {
+          flex: 1;
+          background: #f8f9fa;
+          border-radius: 12rpx;
+          padding: 24rpx;
+        }
+        
+        .section-header, .item-header {
+          display: flex;
+          align-items: center;
+          margin-bottom: 16rpx;
+          
+          .item-icon {
+            font-size: 32rpx;
+            margin-right: 12rpx;
+          }
+          
+          .section-title, .item-title {
+            font-size: 28rpx;
+            font-weight: bold;
+            color: #333;
+          }
+        }
+        
+        .time-content, .price-content {
+          padding-left: 44rpx;
+          
+          .time-text {
+            font-size: 26rpx;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 8rpx;
+            
+            &.valid {
+              color: #4CAF50;
+            }
+            
+            &.expired {
+              color: #f44336;
+            }
+          }
+          
+          .remaining-days {
+            font-size: 28rpx;
+            color: rgba(255, 255, 255, 0.7);
+            padding: 8rpx 8rpx;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10rpx;
+          }
+        }
+        
+        .trial-content {
+          display: flex;
+          flex-direction: column;
+          
+          .trial-info {
+            font-size: 22rpx;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.6;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12rpx 16rpx;
+            border-radius: 10rpx;
+            border: 1rpx solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(5rpx);
+          }
+        }
+        
+        .price-content {
+          display: flex;
+          flex-direction: column;
+          gap: 8rpx;
+          
+          .price-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6rpx 12rpx;
+            background: linear-gradient(45deg, rgba(255, 215, 0, 0.15), rgba(255, 193, 7, 0.15));
+            border: 1rpx solid rgba(255, 215, 0, 0.3);
+            border-radius: 8rpx;
+            
+            .price-label {
+              font-size: 20rpx;
+              color: rgba(255, 255, 255, 0.8);
+            }
+            
+            .price-value {
+              font-size: 20rpx;
+              color: #FFD700;
+              font-weight: 600;
+            }
+          }
+        }
+        
+        .trial-buttons {
+          display: flex;
+          flex-direction: column;
+          gap: 8rpx;
+          
+          .apply-btn {
+            padding: 8rpx 12rpx;
+            border-radius: 16rpx;
+            border: 2rpx solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            
+            &::before {
+              content: '';
+              position: absolute;
+              top: 0;
+              left: -100%;
+              width: 100%;
+              height: 100%;
+              background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+              transition: left 0.5s;
+            }
+            
+            &:hover {
+              transform: translateY(-1rpx);
+              box-shadow: 0 4rpx 15rpx rgba(0, 0, 0, 0.3);
+              
+              &::before {
+                left: 100%;
+              }
+            }
+            
+            &:active {
+              transform: translateY(0);
+            }
+            
+            &.trial-btn {
+              background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
+              box-shadow: 0 3rpx 12rpx rgba(255, 107, 107, 0.4);
+              
+              &:hover {
+                background: linear-gradient(135deg, #FF5252, #FF7A7A);
+                box-shadow: 0 5rpx 20rpx rgba(255, 107, 107, 0.5);
+              }
+            }
+            
+            &.open-btn {
+              background: linear-gradient(135deg, #4CAF50, #66BB6A);
+              box-shadow: 0 3rpx 12rpx rgba(76, 175, 80, 0.4);
+              
+              &:hover {
+                background: linear-gradient(135deg, #388E3C, #4CAF50);
+                box-shadow: 0 5rpx 20rpx rgba(76, 175, 80, 0.5);
+              }
+            }
+            
+            &.open-btn-month {
+              background: linear-gradient(135deg, #2196F3, #42A5F5);
+              box-shadow: 0 3rpx 12rpx rgba(33, 150, 243, 0.4);
+              
+              &:hover {
+                background: linear-gradient(135deg, #1976D2, #2196F3);
+                box-shadow: 0 5rpx 20rpx rgba(33, 150, 243, 0.5);
+              }
+            }
+            
+            .apply-text {
+              font-size: 20rpx;
+              font-weight: 600;
+              color: #fff;
+              text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.3);
+              text-align: center;
+              white-space: nowrap;
+            }
+          }
+        }
+        
+        .description-content {
+          padding-left: 44rpx;
+          
+          .description-text {
+            font-size: 26rpx;
+            color: #666;
+            line-height: 1.6;
+          }
+        }
+      }
+    }
+  }
+}
+
+// 配置列表样式
+.config-list {
+  padding: 20rpx;
+  
+  .config-item {
+    background: white;
+    border-radius: 16rpx;
+    margin-bottom: 20rpx;
+    padding: 30rpx;
+    box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+    
+    .config-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20rpx;
+      padding-bottom: 20rpx;
+      border-bottom: 1rpx solid #f0f0f0;
+      
+      .config-name {
+        display: flex;
+        align-items: center;
+        
+        .name-text {
+          font-size: 32rpx;
+          font-weight: bold;
+          color: #333;
+          margin-right: 16rpx;
+        }
+        
+        .status-badge {
+          padding: 8rpx 16rpx;
+          border-radius: 20rpx;
+          font-size: 22rpx;
+          font-weight: bold;
+          
+          &.status-enabled {
+            background: #e8f5e8;
+            color: #4CAF50;
+          }
+          
+          &.status-disabled {
+            background: #ffeaea;
+            color: #f44336;
+          }
+        }
+      }
+      
+      .config-type {
+        font-size: 24rpx;
+        color: #666;
+        background: #f5f5f5;
+        padding: 8rpx 12rpx;
+        border-radius: 8rpx;
+      }
+    }
+    
+    .config-details {
+      margin-bottom: 20rpx;
+      
+      .detail-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 12rpx;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+        
+        .label {
+          font-size: 26rpx;
+          color: #666;
+          width: 160rpx;
+          flex-shrink: 0;
+        }
+        
+        .value {
+          font-size: 26rpx;
+          color: #333;
+          flex: 1;
+          
+          &.account-info {
+            font-weight: bold;
+          }
+          
+          &.game-names, &.url-names {
+            font-size: 24rpx;
+            line-height: 1.4;
+          }
+        }
+        
+        .online-status {
+          padding: 4rpx 12rpx;
+          border-radius: 12rpx;
+          font-size: 22rpx;
+          font-weight: bold;
+          
+          &.online {
+            background: #e8f5e8;
+            color: #4CAF50;
+          }
+          
+          &.offline {
+            background: #ffeaea;
+            color: #f44336;
+          }
+        }
+        
+        .profit-positive {
+          color: #4CAF50;
+        }
+        
+        .profit-negative {
+          color: #f44336;
+        }
+        
+        .profit-zero {
+          color: #666;
+        }
+      }
+    }
+    
+    .config-actions {
+      display: flex;
+      gap: 16rpx;
+      flex-wrap: wrap;
+    }
+  }
+}
+
+// 详情弹窗样式
+.detail-popup {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  
+  .popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 30rpx;
+    background: #f8f9fa;
+    border-bottom: 1rpx solid #e9ecef;
+    
+    .header-left, .header-right {
+      width: 120rpx;
+    }
+    
+    .close-btn, .edit-btn {
+      font-size: 28rpx;
+      color: #007aff;
+      cursor: pointer;
+    }
+    
+    .header-center {
+      flex: 1;
+      text-align: center;
+      
+      .popup-title {
+        font-size: 32rpx;
+        font-weight: bold;
+        color: #333;
+        display: block;
+      }
+      
+      .scroll-tip {
+        font-size: 22rpx;
+        color: #999;
+        margin-top: 4rpx;
+        display: block;
+      }
+    }
+  }
+  
+  .detail-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20rpx;
+    
+    .detail-section {
+      background: white;
+      border-radius: 12rpx;
+      padding: 24rpx;
+      margin-bottom: 20rpx;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+      
+      .section-title {
+        font-size: 28rpx;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 20rpx;
+        padding-bottom: 12rpx;
+        border-bottom: 1rpx solid #f0f0f0;
+      }
+      
+      .detail-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16rpx;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+        
+        .item-label {
+          font-size: 26rpx;
+          color: #666;
+          width: 160rpx;
+          flex-shrink: 0;
+        }
+        
+        .item-value {
+          font-size: 26rpx;
+          color: #333;
+          flex: 1;
+          text-align: right;
+          
+          &.account-info {
+            font-weight: bold;
+          }
+          
+          &.url-text {
+            font-size: 24rpx;
+            line-height: 1.4;
+            word-break: break-all;
+          }
+        }
+        
+        .online-status, .status-badge {
+          padding: 4rpx 12rpx;
+          border-radius: 12rpx;
+          font-size: 22rpx;
+          font-weight: bold;
+        }
+        
+        .online-status {
+          &.online {
+            background: #e8f5e8;
+            color: #4CAF50;
+          }
+          
+          &.offline {
+            background: #ffeaea;
+            color: #f44336;
+          }
+        }
+        
+        .status-badge {
+          &.status-enabled {
+            background: #e8f5e8;
+            color: #4CAF50;
+          }
+          
+          &.status-disabled {
+            background: #ffeaea;
+            color: #f44336;
+          }
+        }
+        
+        .profit-positive {
+          color: #4CAF50;
+        }
+        
+        .profit-negative {
+          color: #f44336;
+        }
+        
+        .profit-zero {
+          color: #666;
+        }
+      }
+    }
+  }
+}
+</style>

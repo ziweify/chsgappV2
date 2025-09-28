@@ -317,6 +317,7 @@
                 </view>
                 <view class="fullscreen-panel span1" @click="showFullScreenPanel">
                   <image src="/static/image/icon/customer.png"></image>
+                  <text class="span1-text">打单配置</text>
                 </view>
                 <view class="customer span1" @click="customerTo">
                   <image src="/static/image/icon/customer.png"></image>
@@ -491,7 +492,7 @@
       </u-popup>
       
       <!-- 快捷打单配置弹窗 - 简单版本 -->
-      <u-popup :show="isShowFullScreenPanel" mode="center" :closeOnClickOverlay="true" @close="closeBettingCenter" :safeAreaInsetTop="true" :customStyle="{'width':'100%','height':'100%'}">
+      <u-popup :show="isShowFullScreenPanel" mode="center" :closeOnClickOverlay="true" @close="closeBettingCenter" :safeAreaInsetTop="true" :customStyle="{'width':'95%','height':'90%','max-width':'800px','border-radius':'16px'}">
         <view class="quick-config-panel">
           <view class="quick-config-header">
             <text class="header-title">快捷打单配置</text>
@@ -500,14 +501,13 @@
             </view>
           </view>
           <view class="quick-config-content">
-            <iframe 
-              :src="configPageUrl" 
-              class="config-iframe"
-              frameborder="0"
-              width="100%"
-              height="100%"
-              style="border: none; background: white;">
-            </iframe>
+            <!-- 使用可复用的outbet配置组件 -->
+            <OutbetConfigComponent 
+              :isPopupMode="true" 
+              :backUrl="'copage/chat'"
+              @addConfig="handleAddConfig"
+              @editConfig="handleEditConfig"
+            />
           </view>
         </view>
       </u-popup>
@@ -639,11 +639,13 @@ import {IMAGE_REQUEST_URL} from "@/common/config";
 import {siteConfig} from "../libs/mixin/mixin";
 import CustomCollapse from '@/components/custom-collapse/custom-collapse.vue';
 import CustomCollapseItem from '@/components/custom-collapse/custom-collapse-item.vue';
+import OutbetConfigComponent from '@/components/OutbetConfigComponent.vue';
 import clipboardUtils from '@/common/clipboardUtils.js';
 export default {
   components: {
     CustomCollapse,
-    CustomCollapseItem
+    CustomCollapseItem,
+    OutbetConfigComponent
   },
   mixins: [uni.$mymixin],
   data() {
@@ -2826,9 +2828,9 @@ export default {
       this.isShowSwitchPannel = !this.isShowSwitchPannel
     },
     showFullScreenPanel() {
-      // 设置iframe的URL，直接使用原始页面
-      this.configPageUrl = `${window.location.origin}/#/agent/manage/outbet/outbetlist?from=room`;
-      this.isShowFullScreenPanel = !this.isShowFullScreenPanel
+      console.log('🎯 点击打单配置按钮，当前状态:', this.isShowFullScreenPanel);
+      this.isShowFullScreenPanel = !this.isShowFullScreenPanel;
+      console.log('🎯 弹窗状态已切换为:', this.isShowFullScreenPanel);
     },
     
     closeBettingCenter() {
@@ -2858,6 +2860,7 @@ export default {
       uni.setStorageSync('backUrl', 'copage/chat');
       uni.$utils.jump('/agent/manage/outbet/outbetadd?from=room');
     },
+    
     
     // 处理编辑配置事件
     handleEditConfig(item) {
@@ -4412,6 +4415,20 @@ export default {
 .fullscreen-panel.span1 {
   background: #4CAF50 !important; /* 绿色背景 */
   border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.span1-text {
+  font-size: 20rpx;
+  color: white;
+  margin-top: 4rpx;
+  text-align: center;
+  line-height: 1;
+  font-weight: bold;
 }
 
 /* 快捷配置弹窗样式 */
@@ -4454,12 +4471,10 @@ export default {
   height: calc(100vh - 60rpx); /* 减去标题栏高度 */
 }
 
-/* iframe样式 */
-.config-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: white;
+/* 弹窗中的组件样式调整 */
+.quick-config-content {
+  flex: 1;
+  overflow: hidden;
 }
 
 </style>
