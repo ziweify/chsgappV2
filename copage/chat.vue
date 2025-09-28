@@ -490,20 +490,24 @@
         </view>
       </u-popup>
       
-      <!-- 全屏快捷导航面板 - 与switchGame相同方式，只是全屏显示 -->
-      <u-popup :show="isShowFullScreenPanel" mode="center" :closeOnClickOverlay="true" @close="isShowFullScreenPanel = !isShowFullScreenPanel" :safeAreaInsetTop="true" :customStyle="{'width':'100%','height':'100%'}">
-        <view class="fullscreen-panel-container">
-          <!-- 标题栏 -->
-          <view class="fullscreen-panel-header">
-            <view class="panel-title">快捷导航</view>
-            <view class="panel-close" @click="isShowFullScreenPanel = false">
+      <!-- 快捷打单配置弹窗 - 简单版本 -->
+      <u-popup :show="isShowFullScreenPanel" mode="center" :closeOnClickOverlay="true" @close="isShowFullScreenPanel = false" :safeAreaInsetTop="true" :customStyle="{'width':'100%','height':'100%'}">
+        <view class="quick-config-panel">
+          <view class="quick-config-header">
+            <text class="header-title">快捷打单配置</text>
+            <view class="header-close" @click="isShowFullScreenPanel = false">
               <u-icon name="close" color="#fff" size="20"></u-icon>
             </view>
           </view>
-          
-          <!-- 内容区域 -->
-          <view class="fullscreen-panel-content">
-            <text>全屏快捷导航面板 - 空白页面</text>
+          <view class="quick-config-content">
+            <iframe 
+              :src="configPageUrl" 
+              class="config-iframe"
+              frameborder="0"
+              width="100%"
+              height="100%"
+              style="border: none; background: white;">
+            </iframe>
           </view>
         </view>
       </u-popup>
@@ -665,7 +669,8 @@ export default {
       lastScrollPosition: null, // 最后的滚动位置，用于恢复
       tabclassIndex: 0,
       isShowSwitchPannel: false,
-      isShowFullScreenPanel: false, // 新增：全屏快捷导航面板
+      isShowFullScreenPanel: false, // 全屏快捷导航面板
+      configPageUrl: '', // 打单配置页面URL
       isshowright: true,
       isshowpredict: false,
       isclshow: false,
@@ -2630,7 +2635,26 @@ export default {
       this.isShowSwitchPannel = !this.isShowSwitchPannel
     },
     showFullScreenPanel() {
+      // 设置iframe的URL，直接使用原始页面
+      this.configPageUrl = `${window.location.origin}/#/agent/manage/outbet/outbetlist?from=room`;
       this.isShowFullScreenPanel = !this.isShowFullScreenPanel
+    },
+    // 处理添加配置事件
+    handleAddConfig() {
+      // 关闭快捷导航弹窗
+      this.isShowFullScreenPanel = false;
+      // 跳转到添加配置页面
+      uni.setStorageSync('backUrl', 'copage/chat');
+      uni.$utils.jump('/agent/manage/outbet/outbetadd?from=room');
+    },
+    
+    // 处理编辑配置事件
+    handleEditConfig(item) {
+      // 关闭快捷导航弹窗
+      this.isShowFullScreenPanel = false;
+      // 跳转到编辑配置页面
+      uni.setStorageSync('backUrl', 'copage/chat');
+      uni.$utils.jump('/agent/manage/outbet/outbetadd?id=' + item.id + '&from=room');
     },
     msgOrderDetail(item,orderShowTtype){
       this.orderShowTtype = orderShowTtype;
@@ -4167,14 +4191,14 @@ export default {
   }
 }
 
-/* 快捷导航按钮样式 - 绿色背景 */
+/* 快捷打单配置按钮样式 - 绿色背景 */
 .fullscreen-panel.span1 {
   background: #4CAF50 !important; /* 绿色背景 */
   border-radius: 50%;
 }
 
-/* 全屏快捷导航面板样式 */
-.fullscreen-panel-container {
+/* 快捷配置弹窗样式 */
+.quick-config-panel {
   width: 100%;
   height: 100%;
   background: #f5f5f5;
@@ -4182,40 +4206,43 @@ export default {
   flex-direction: column;
 }
 
-.fullscreen-panel-header {
-  height: 48rpx; /* 24*2 = 48rpx */
+.quick-config-header {
+  height: 60rpx;
   background: #007aff;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 30rpx;
-  position: relative;
-  z-index: 999;
 }
 
-.panel-title {
+.header-title {
   font-size: 32rpx;
   font-weight: bold;
   color: #fff;
 }
 
-.panel-close {
-  width: 48rpx;
-  height: 48rpx;
+.header-close {
+  width: 60rpx;
+  height: 60rpx;
   display: flex;
   justify-content: center;
   align-items: center;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 50%;
-  cursor: pointer;
 }
 
-.fullscreen-panel-content {
+.quick-config-content {
   flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 32rpx;
-  color: #666;
+  overflow: auto;
+  height: calc(100vh - 60rpx); /* 减去标题栏高度 */
 }
+
+/* iframe样式 */
+.config-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: white;
+}
+
 </style>

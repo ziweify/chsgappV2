@@ -2,7 +2,7 @@
   <view class="layout">
     <z-paging ref="paging" v-model="list" :show-empty-view-reload="true" safe-area-inset-bottom @query="queryList" :default-page-size="20">
       <template #top>
-        <TsCustom :backUrl="backUrl" :isBack="true" title="打单配置列表">
+        <TsCustom :backUrl="backUrl" :isBack="showBackButton" title="打单配置列表">
           <block slot='right'>
             <view @click="goToAddConfig()">添加配置</view>
           </block>
@@ -297,6 +297,7 @@ export default {
     return {
       list:[],
       backUrl:"agent/manage/outbetmanage",
+      showBackButton: true, // 默认显示返回按钮
       query:{
         keyword:''
       },
@@ -326,6 +327,18 @@ export default {
     };
   },
   onShow() {
+    // 检测是否从房间打单中心进入
+    const pages = getCurrentPages();
+    const currentPage = pages[pages.length - 1];
+    const options = currentPage.options || {};
+    
+    // 如果URL参数包含from=room，则隐藏返回按钮
+    if (options.from === 'room') {
+      this.showBackButton = false;
+    } else {
+      this.showBackButton = true;
+    }
+    
     // 页面显示时刷新数据，确保从添加/编辑页面返回时数据是最新的
     this.getConfigInfo(); // 刷新配置信息
     if (this.$refs.paging) {
