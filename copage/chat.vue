@@ -491,11 +491,11 @@
       </u-popup>
       
       <!-- 快捷打单配置弹窗 - 简单版本 -->
-      <u-popup :show="isShowFullScreenPanel" mode="center" :closeOnClickOverlay="true" @close="isShowFullScreenPanel = false" :safeAreaInsetTop="true" :customStyle="{'width':'100%','height':'100%'}">
+      <u-popup :show="isShowFullScreenPanel" mode="center" :closeOnClickOverlay="true" @close="closeBettingCenter" :safeAreaInsetTop="true" :customStyle="{'width':'100%','height':'100%'}">
         <view class="quick-config-panel">
           <view class="quick-config-header">
             <text class="header-title">快捷打单配置</text>
-            <view class="header-close" @click="isShowFullScreenPanel = false">
+            <view class="header-close" @click="closeBettingCenter">
               <u-icon name="close" color="#fff" size="20"></u-icon>
             </view>
           </view>
@@ -671,6 +671,8 @@ export default {
       isShowSwitchPannel: false,
       isShowFullScreenPanel: false, // 全屏快捷导航面板
       configPageUrl: '', // 打单配置页面URL
+      isBettingCenterClosing: false, // 标记是否正在关闭打单中心弹窗
+      pendingMessages: [], // 待显示的消息缓存（当不在底部时）
       isshowright: true,
       isshowpredict: false,
       isclshow: false,
@@ -1150,6 +1152,12 @@ export default {
     syncChatData() {
       console.log('🔄 同步聊天数据');
       
+      // 防闪烁检查：如果打单中心正在关闭，跳过数据同步
+      if (this.isBettingCenterClosing) {
+        console.log('🚫 打单中心正在关闭，跳过聊天数据同步');
+        return;
+      }
+      
       if(!uni.$socketUtils.isOpenSocket) {
         console.warn('WebSocket未连接，无法同步数据');
         return;
@@ -1287,6 +1295,11 @@ export default {
     
     // 检测并同步WebSocket状态
     checkAndSyncWebSocketStatus() {
+      // 防闪烁检查：如果打单中心正在关闭，跳过状态检测
+      if (this.isBettingCenterClosing) {
+        return;
+      }
+      
       if (!uni.$socketUtils) {
         return;
       }
@@ -1428,6 +1441,12 @@ export default {
       this.safeExecute(() => {
         //console.log('🔌 WebSocket连接成功，准备加载数据');
         
+        // 防闪烁检查：如果打单中心正在关闭，跳过数据加载
+        if (this.isBettingCenterClosing) {
+          console.log('🚫 打单中心正在关闭，跳过WebSocket数据加载');
+          return;
+        }
+        
         // 检查是否是首次加载（页面刚打开时的连接）
         const isFirstLoad = this.reloadflag;
         
@@ -1479,35 +1498,67 @@ export default {
     // 游戏聊天消息
     onGameChat(data) {
       this.safeExecute(() => {
+        // 消息计数器（用于调试）
+        if (!this.messageCounter) this.messageCounter = 0;
+        this.messageCounter++;
+        
+        // 调试日志：确认消息接收正常（弹窗状态无关）
+        console.log(`📨 [${this.messageCounter}] 收到聊天消息，弹窗状态:`, this.isShowFullScreenPanel ? '已打开' : '已关闭', '当前位置:', this.isAtBottom ? '底部' : '非底部');
+        console.log('📨 消息详情:', {
+          data: data.data,
+          other: data.other,
+          otherType: Array.isArray(data.other) ? 'Array' : typeof data.other,
+          msgid: data.other?.msgid,
+          sender: data.data?.sender,
+          currentUid: this.uid
+        });
         let msg = data.data;
-        let isBottom = false;
-        if (!this.isAtBottom) {
-          if(Array.isArray(msg)){
-            this.unreadCount += msg.length;
-          }else{
-            this.unreadCount += 1;
-          }
-          if(this.tmpToButomFlag){
-            isBottom = true;
-          }
-        }else{
-          isBottom = true;
+        let shouldShowImmediately = false;
+        
+        // 判断是否应该立即显示消息
+        if (this.isAtBottom) {
+          shouldShowImmediately = true;
+        } else if (this.tmpToButomFlag) {
+          // 用户刚发送消息，强制显示
+          shouldShowImmediately = true;
         }
         
         if(Array.isArray(msg)){
-          // 批量消息，通常是服务器推送的实时消息，应该按时间顺序添加到末尾
-          this.$nextTick(function (){
-            this.chatList = this.chatList.concat(msg);
-            this.tmpToButomFlag = false;
-          });
+          // 批量消息处理
+          if (shouldShowImmediately) {
+            // 立即显示消息
+            this.$nextTick(() => {
+              this.chatList = this.chatList.concat(msg);
+              this.tmpToButomFlag = false;
+            });
+          } else {
+            // 不在底部，缓存消息并增加未读计数
+            this.pendingMessages = this.pendingMessages.concat(msg);
+            this.unreadCount += msg.length;
+            console.log('📦 消息已缓存，未读计数:', this.unreadCount, '缓存消息数:', this.pendingMessages.length);
+          }
         }else{
-          if(data.other.msgid && msg.sender == this.uid){
+          // 单个消息处理
+          // 检查是否是自己发送的消息确认
+          // data.other 可能是对象（包含msgid）或数组
+          const hasMessageId = data.other && !Array.isArray(data.other) && data.other.msgid;
+          if(hasMessageId && msg.sender == this.uid){
+            // 自己发送的消息确认 - 总是立即显示
+            shouldShowImmediately = true; // 确保自己的消息确认后能正确滚动
+            console.log('✅ 收到自己消息确认，msgid:', data.other.msgid, '昵称:', msg.nickname);
+            let found = false;
             for (let i = 0; i < this.chatList.length; i++) {
               let oitem = this.chatList[i];
               if(data.other.msgid === oitem.msgid){
-                this.chatList[i].nickname = msg.nickname;
+                console.log('🔄 更新消息昵称，从', oitem.nickname, '到', msg.nickname);
+                // 使用 $set 确保响应式更新
+                this.$set(this.chatList[i], 'nickname', msg.nickname);
+                found = true;
                 break;
               }
+            }
+            if (!found) {
+              console.warn('⚠️ 未找到对应的消息进行昵称更新，msgid:', data.other.msgid);
             }
             uni.setStorageSync('sendmsg',this.sendmsg);
             this.sendmsg = "";
@@ -1518,15 +1569,48 @@ export default {
               this.toBottom();
             }
           }else{
-            this.$nextTick(function (){
-              this.chatList.push(msg);
-              this.tmpToButomFlag = false;
-            });
+            // 其他消息处理
+            if (msg.sender == this.uid) {
+              console.log('🔄 收到自己消息的广播（非确认），内容:', msg.content, '昵称:', msg.nickname);
+              // 这是自己消息的广播，检查是否已存在相同内容的消息
+              const existingMsg = this.chatList.find(item => 
+                item.sender == this.uid && 
+                item.content == msg.content && 
+                (item.nickname == '发送中' || item.nickname == msg.nickname)
+              );
+              if (existingMsg) {
+                console.log('🔄 找到现有消息，更新昵称从', existingMsg.nickname, '到', msg.nickname);
+                // 如果找到"发送中"的消息，更新为正确的昵称
+                if (existingMsg.nickname == '发送中') {
+                  this.$set(existingMsg, 'nickname', msg.nickname);
+                }
+                return; // 跳过重复添加
+              } else {
+                console.log('⚠️ 未找到对应的"发送中"消息，可能是历史消息');
+                // 如果没找到对应的"发送中"消息，说明可能是历史消息或页面刷新后的消息
+                // 这种情况下正常处理，但不需要特殊逻辑
+              }
+            } else {
+              console.log('👥 收到其他人的消息，发送者ID:', msg.sender, '昵称:', msg.nickname, '内容:', msg.content);
+            }
+            
+            // 其他人的消息或自己的历史消息 - 根据位置决定是否立即显示
+            if (shouldShowImmediately) {
+              this.$nextTick(() => {
+                this.chatList.push(msg);
+                this.tmpToButomFlag = false;
+              });
+            } else {
+              // 不在底部，缓存消息并增加未读计数
+              this.pendingMessages.push(msg);
+              this.unreadCount += 1;
+              console.log('📦 单个消息已缓存，未读计数:', this.unreadCount, '缓存消息数:', this.pendingMessages.length);
+            }
           }
         }
         
-        // 只有不是在加载更多时才自动滚动到底部
-        if(isBottom && this.swiperCurrent == 0 && !this.isLoadingMore && !this.tmpToButomFlag){
+        // 只有在应该立即显示且不是在加载更多时才自动滚动到底部
+        if(shouldShowImmediately && this.swiperCurrent == 0 && !this.isLoadingMore && !this.tmpToButomFlag){
           this.toBottom();
         }
         
@@ -2228,11 +2312,29 @@ export default {
         this.toBottom(150);
       }
     },
+    
+    // 加载待显示的消息
+    loadPendingMessages() {
+      if (this.pendingMessages.length > 0) {
+        console.log('📥 加载待显示消息:', this.pendingMessages.length, '条');
+        // 将待显示的消息添加到聊天列表
+        this.chatList = this.chatList.concat(this.pendingMessages);
+        // 清空待显示消息缓存
+        this.pendingMessages = [];
+        // 重置未读计数
+        this.unreadCount = 0;
+        console.log('✅ 待显示消息已加载，未读计数已重置');
+      }
+    },
+    
     toBottom(duration = 150, smooth = true){
       // 如果正在加载更多，不执行滚动到底部
       if (this.isLoadingMore) {
         return;
       }
+      
+      // 加载待显示的消息
+      this.loadPendingMessages();
       
       // 更新最后滚动时间
       this.updateLastScrollTime();
@@ -2639,6 +2741,26 @@ export default {
       this.configPageUrl = `${window.location.origin}/#/agent/manage/outbet/outbetlist?from=room`;
       this.isShowFullScreenPanel = !this.isShowFullScreenPanel
     },
+    
+    closeBettingCenter() {
+      console.log('🚪 关闭打单中心弹窗，设置保护标志');
+      this.isBettingCenterClosing = true; // 标记正在关闭
+      this.isShowFullScreenPanel = false;
+      
+      // 同时设置WebSocket的弹窗关闭标志
+      if (uni.$socketUtils) {
+        uni.$socketUtils.isBettingCenterClosing = true;
+      }
+      
+      // 500ms后重置标志，避免影响后续正常操作
+      setTimeout(() => {
+        this.isBettingCenterClosing = false;
+        if (uni.$socketUtils) {
+          uni.$socketUtils.isBettingCenterClosing = false;
+        }
+        console.log('🔄 打单中心关闭保护标志已重置');
+      }, 500);
+    },
     // 处理添加配置事件
     handleAddConfig() {
       // 关闭快捷导航弹窗
@@ -2672,6 +2794,12 @@ export default {
       //console.log('initializePageShow');
       if(this.previewImageFlag){
         this.previewImageFlag = false;
+        return;
+      }
+      
+      // 防闪烁检查：如果打单中心正在关闭，跳过页面显示初始化
+      if (this.isBettingCenterClosing) {
+        console.log('🚫 打单中心正在关闭，跳过页面显示初始化');
         return;
       }
 

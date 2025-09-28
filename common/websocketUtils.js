@@ -28,6 +28,9 @@ class websocketUtils {
         // 重连防抖机制
         this.lastReconnectTime = 0; // 最后一次重连时间
         this.reconnectDebounceDelay = 3000; // 重连防抖间隔3秒
+        
+        // 防闪烁机制
+        this.isBettingCenterClosing = false; // 打单中心弹窗关闭标志
         this.reconnectDebounceTimer = null; // 重连防抖定时器
         this.reconnectLock = false; // 重连锁，防止并发重连
         
@@ -51,6 +54,12 @@ class websocketUtils {
     // 统一重连方法 - 确保同时只有一个重连过程
     debouncedReconnect(reason = 'unknown', forceImmediate = false) {
         const now = Date.now();
+        
+        // 防闪烁检查：如果打单中心正在关闭，跳过重连
+        if (this.isBettingCenterClosing) {
+            // console.log(`跳过重连: 打单中心正在关闭，原因=${reason}`);
+            return;
+        }
         
         // 如果连接已存在、用户关闭、或者正在重连中、或者有重连锁，直接返回
         if (this.isOpenSocket || this.isUserClose || !this.shouldAutoReconnect || this.isUserExitApp || this.disableAutoReconnect || this.isReconnecting || this.reconnectLock) {
@@ -175,8 +184,10 @@ class websocketUtils {
             const visibilityChangeHandler = () => {
                 if (document.visibilityState === 'visible') {
                     // console.log('H5: 页面变为可见，检查连接状态');
-                    // 页面变为可见时，使用防抖重连
-                    this.debouncedReconnect('page_visible');
+                    // 页面变为可见时，只在WebSocket未连接时才重连
+                    if (!this.isOpenSocket && !this.isUserClose && this.shouldAutoReconnect) {
+                        this.debouncedReconnect('page_visible');
+                    }
                 } else {
                     // console.log('H5: 页面变为隐藏');
                 }
@@ -188,8 +199,10 @@ class websocketUtils {
             // 监听窗口焦点变化（作为备用）
             window.addEventListener('focus', () => {
                 // console.log('H5: 窗口获得焦点');
-                // 使用防抖重连，避免与页面可见性监听冲突
-                this.debouncedReconnect('window_focus');
+                // 只在WebSocket未连接时才重连，避免与页面可见性监听冲突
+                if (!this.isOpenSocket && !this.isUserClose && this.shouldAutoReconnect) {
+                    this.debouncedReconnect('window_focus');
+                }
             });
             
             // console.log('H5: 页面可见性监听已初始化，当前状态:', document.visibilityState);
