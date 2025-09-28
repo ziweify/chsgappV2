@@ -1539,37 +1539,100 @@ export default {
           }
         }else{
           // 单个消息处理
-          // 检查是否是自己发送的消息确认
-          // data.other 可能是对象（包含msgid）或数组
+          // 简化的消息处理逻辑
           const hasMessageId = data.other && !Array.isArray(data.other) && data.other.msgid;
-          if(hasMessageId && msg.sender == this.uid){
-            // 自己发送的消息确认 - 总是立即显示
-            shouldShowImmediately = true; // 确保自己的消息确认后能正确滚动
-            console.log('✅ 收到自己消息确认，msgid:', data.other.msgid, '昵称:', msg.nickname);
+          
+          if(hasMessageId){
+            console.log('✅ 收到带msgid的消息，发送者:', msg.sender, '内容:', msg.content);
+            
+            // 如果是自己发送的消息确认
+            if(msg.sender == this.uid) {
+              console.log('🔄 这是自己消息的确认，查找并更新"发送中"状态');
+              let found = false;
+              for (let i = 0; i < this.chatList.length; i++) {
+                let oitem = this.chatList[i];
+                if(data.other.msgid === oitem.msgid && oitem.sender == this.uid && oitem.nickname == '发送中'){
+                  console.log('✅ 找到"发送中"消息，更新为正确昵称');
+                  this.$set(this.chatList[i], 'nickname', this.nickname || '我');
+                  // 清空输入框
+                  uni.setStorageSync('sendmsg',this.sendmsg);
+                  this.sendmsg = "";
+                  this.tmpToButomFlag = false;
+                  !data.other?.openResult && uni.$socketUtils.send({eventType:"getBalanceInfo"});
+                  found = true;
+                  break;
+                }
+              }
+              if(!found) {
+                console.log('⚠️ 未找到对应的"发送中"消息，可能是历史消息');
+                // 作为新消息处理
+                shouldShowImmediately = true;
+              } else {
+                // 确认消息处理完成，滚动到底部
+                if(this.swiperCurrent == 0 && !this.isLoadingMore){
+                  this.toBottom();
+                }
+                return; // 不添加到聊天列表
+              }
+            } else {
+              // 其他人的消息，直接显示
+              console.log('👥 收到其他人的消息:', msg.content);
+              console.log('✅ 立即显示其他人的消息');
+              this.$nextTick(() => {
+                this.chatList.push(msg);
+              });
+              // 滚动到底部
+              if(this.swiperCurrent == 0 && !this.isLoadingMore){
+                this.toBottom();
+              }
+              return; // 处理完成，直接返回
+            }
+          }else if(msg.sender == this.uid && (!data.other || Array.isArray(data.other))){
+            // 备用确认机制：自己的消息但没有msgid，尝试按内容匹配更新
+            console.log('🔄 备用确认机制：尝试按内容匹配更新消息，内容:', msg.content, '昵称:', msg.nickname);
             let found = false;
-            for (let i = 0; i < this.chatList.length; i++) {
+            
+            // 查找最近的"发送中"消息进行更新
+            for (let i = this.chatList.length - 1; i >= 0; i--) {
               let oitem = this.chatList[i];
-              if(data.other.msgid === oitem.msgid){
-                console.log('🔄 更新消息昵称，从', oitem.nickname, '到', msg.nickname);
-                // 使用 $set 确保响应式更新
+              if(oitem.sender == this.uid && oitem.content == msg.content && oitem.nickname == '发送中'){
+                console.log('✅ 找到匹配的"发送中"消息，更新昵称到:', msg.nickname);
                 this.$set(this.chatList[i], 'nickname', msg.nickname);
                 found = true;
                 break;
               }
             }
+            
             if (!found) {
-              console.warn('⚠️ 未找到对应的消息进行昵称更新，msgid:', data.other.msgid);
-            }
-            uni.setStorageSync('sendmsg',this.sendmsg);
-            this.sendmsg = "";
-            this.tmpToButomFlag = false; // 重置标志，允许滚动
-            !data.other.openResult && uni.$socketUtils.send({eventType:"getBalanceInfo"});
-            // 自己发送的消息确认后，确保滚动到底部
-            if(this.swiperCurrent == 0 && !this.isLoadingMore){
-              this.toBottom();
+              console.warn('⚠️ 备用确认机制：未找到匹配的"发送中"消息，作为新消息显示');
+              // 如果没找到匹配的消息，作为新消息显示
+              console.log('✅ 立即显示系统回复消息:', msg.content);
+              this.$nextTick(() => {
+                this.chatList.push(msg);
+              });
+              // 滚动到底部
+              if(this.swiperCurrent == 0 && !this.isLoadingMore){
+                this.toBottom();
+              }
+              return; // 处理完成
+            } else {
+              // 找到了匹配的消息，确认处理完成
+              // 清空输入框和重置状态
+              uni.setStorageSync('sendmsg',this.sendmsg);
+              this.sendmsg = "";
+              this.tmpToButomFlag = false;
+              !data.other?.openResult && uni.$socketUtils.send({eventType:"getBalanceInfo"});
+              
+              // 滚动到底部
+              if(this.swiperCurrent == 0 && !this.isLoadingMore){
+                this.toBottom();
+              }
+              return;
             }
           }else{
             // 其他消息处理
+            console.log('🎯 成功进入else分支 - 其他消息处理');
+            console.log('🔄 进入其他消息处理分支，msg.sender:', msg.sender, 'this.uid:', this.uid);
             if (msg.sender == this.uid) {
               console.log('🔄 收到自己消息的广播（非确认），内容:', msg.content, '昵称:', msg.nickname);
               // 这是自己消息的广播，检查是否已存在相同内容的消息
@@ -1595,13 +1658,23 @@ export default {
             }
             
             // 其他人的消息或自己的历史消息 - 根据位置决定是否立即显示
+            console.log('🔍 消息显示判断:', {
+              shouldShowImmediately,
+              isAtBottom: this.isAtBottom,
+              tmpToButomFlag: this.tmpToButomFlag,
+              sender: msg.sender,
+              content: msg.content
+            });
+            
             if (shouldShowImmediately) {
+              console.log('✅ 立即显示消息:', msg.content);
               this.$nextTick(() => {
                 this.chatList.push(msg);
                 this.tmpToButomFlag = false;
               });
             } else {
               // 不在底部，缓存消息并增加未读计数
+              console.log('📦 缓存消息:', msg.content, '原因: shouldShowImmediately =', shouldShowImmediately);
               this.pendingMessages.push(msg);
               this.unreadCount += 1;
               console.log('📦 单个消息已缓存，未读计数:', this.unreadCount, '缓存消息数:', this.pendingMessages.length);
@@ -2109,7 +2182,19 @@ export default {
         return;
       }
       this.tmpToButomFlag = true;
-      uni.$socketUtils.send({eventType:"gamechat",gid:this.gid,content:str});
+      
+      // 创建msgid和"发送中"消息（与普通聊天保持一致）
+      let msgid = this.$u.guid(20);
+      let msgitem = {avatar:this.avatar,chatType:'text',content:str,nickname:'发送中',sender:this.uid,msgid:msgid};
+      this.chatList.push(msgitem);
+      this.toBottom();
+      
+      // 发送下注消息（包含msgid）
+      let that = this;
+      setTimeout(function (){
+        uni.$socketUtils.send({eventType:"gamechat",gid:that.gid,content:str,msgid:msgid});
+      },50);
+      
       //uni.setStorageSync('sendmsg',str);
       //uni.$socketUtils.send({eventType:"getBalanceInfo"});
       this.selectedButtons = [];
