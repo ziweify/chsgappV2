@@ -1,181 +1,169 @@
 <template>
   <view class="outbet-config-container" :class="{ 'popup-mode': isPopupMode }">
-    <z-paging ref="paging" v-model="list" :show-empty-view-reload="true" safe-area-inset-bottom @query="queryList" :default-page-size="20">
-      <template #top>
-        <!-- 只在非弹窗模式显示标题栏 -->
-        <TsCustom v-if="!isPopupMode" :backUrl="backUrl" :isBack="showBackButton" title="打单配置列表">
-          <block slot='right'>
-            <view @click="goToAddConfig()">添加配置</view>
-          </block>
-        </TsCustom>
+    <!-- 只在非弹窗模式显示标题栏 -->
+    <TsCustom v-if="!isPopupMode" :backUrl="backUrl" :isBack="showBackButton" title="打单配置列表">
+      <block slot='right'>
+        <view @click="goToAddConfig()">添加配置</view>
+      </block>
+    </TsCustom>
+    
+    <!-- 配置信息展示区域 -->
+    <view class="config-info-section">
+      <view class="config-info-card">
+        <view class="config-header-info">
+          <view class="config-title">
+            <text class="title-text">打单系统配置</text>
+            <view class="switch-status" :class="configInfo.outbet_switch == 1 ? 'switch-on' : 'switch-off'" @click="toggleSwitch">
+              <text class="switch-icon">🔘</text>
+              <text class="switch-text">{{ configInfo.outbet_switch == 1 ? '已开启' : '已关闭' }}</text>
+              <text class="click-hint">点击切换</text>
+            </view>
+          </view>
+        </view>
         
-        <!-- 弹窗模式下的顶部间距，避免遮挡父弹窗的标题栏 -->
-        <view v-if="isPopupMode" style="height: 20rpx;"></view>
-
-        <!-- 配置信息展示区域 -->
-        <view class="config-info-section">
-          <view class="config-info-card">
-            <view class="config-header-info">
-              <view class="config-title">
-                <text class="title-text">打单系统配置</text>
-                <view class="switch-status" :class="configInfo.outbet_switch == 1 ? 'switch-on' : 'switch-off'" @click="toggleSwitch">
-                  <text class="switch-icon">🔘</text>
-                  <text class="switch-text">{{ configInfo.outbet_switch == 1 ? '已开启' : '已关闭' }}</text>
-                  <text class="click-hint">点击切换</text>
-                </view>
+        <view class="config-content">
+          <!-- 过期时间和价格信息 -->
+          <view class="config-item dual-layout">
+            <!-- 左侧：过期时间区域 -->
+            <view class="left-section">
+              <view class="section-header">
+                <view class="item-icon">📅</view>
+                <text class="section-title">有效期</text>
+              </view>
+              <view class="time-content">
+                <text class="time-text" :class="isExpired ? 'expired' : 'valid'">
+                  {{ formatExpiryTime() }}
+                </text>
+                <text v-if="!isExpired && remainingTimeText" class="remaining-days">
+                  {{ remainingTimeText }}
+                </text>
               </view>
             </view>
             
-            <view class="config-content">
-              <!-- 过期时间和价格信息 -->
-              <view class="config-item dual-layout">
-                <!-- 左侧：过期时间区域 -->
-                <view class="left-section">
-                  <view class="section-header">
-                    <view class="item-icon">📅</view>
-                    <text class="section-title">有效期</text>
-                  </view>
-                  <view class="time-content">
-                    <text class="time-text" :class="isExpired ? 'expired' : 'valid'">
-                      {{ formatExpiryTime() }}
-                    </text>
-                    <text v-if="!isExpired && remainingTimeText" class="remaining-days">
-                      {{ remainingTimeText }}
-                    </text>
-                  </view>
+            <!-- 右侧：开通价格区域 -->
+            <view v-if="configInfo.outbet_money1 > 0 || configInfo.outbet_money2 > 0" class="right-section">
+              <view class="section-header">
+                <view class="item-icon">💰</view>
+                <text class="section-title">开通价格</text>
+              </view>
+              <view class="price-content">
+                <view v-if="configInfo.outbet_money1 > 0" class="price-item">
+                  <text class="price-label">一天</text>
+                  <text class="price-value">{{ configInfo.outbet_money1 }}百胜币</text>
                 </view>
-                
-                <!-- 右侧：开通价格区域 -->
-                <view v-if="configInfo.outbet_money1 > 0 || configInfo.outbet_money2 > 0" class="right-section">
-                  <view class="section-header">
-                    <view class="item-icon">💰</view>
-                    <text class="section-title">开通价格</text>
-                  </view>
-                  <view class="price-content">
-                    <view v-if="configInfo.outbet_money1 > 0" class="price-item">
-                      <text class="price-label">一天</text>
-                      <text class="price-value">{{ configInfo.outbet_money1 }}百胜币</text>
-                    </view>
-                    <view v-if="configInfo.outbet_money2 > 0" class="price-item">
-                      <text class="price-label">一个月</text>
-                      <text class="price-value">{{ configInfo.outbet_money2 }}百胜币</text>
-                    </view>
-                  </view>
+                <view v-if="configInfo.outbet_money2 > 0" class="price-item">
+                  <text class="price-label">一个月</text>
+                  <text class="price-value">{{ configInfo.outbet_money2 }}百胜币</text>
                 </view>
               </view>
-              
-              <!-- 试用信息 -->
-              <view v-if="Number(configInfo.outbet_sy_count) > 0" class="config-item dual-layout">
-                <!-- 左侧：试用说明区域 -->
-                <view class="left-section">
-                  <view class="section-header">
-                    <view class="item-icon">⏰</view>
-                    <text class="section-title">试用说明</text>
-                  </view>
-                  <view class="trial-content">
-                    <text class="trial-info">
-                      每天可以试用{{ configInfo.outbet_sy_count }}次，每次可以试用{{ configInfo.outbet_sy_time }}分钟
-                    </text>
-                  </view>
-                </view>
-                
-                <!-- 右侧：操作按钮区域 -->
-                <view class="right-section">
-                  <view class="section-header">
-                    <view class="item-icon">🚀</view>
-                    <text class="section-title">快速操作</text>
-                  </view>
-                  <view class="trial-buttons">
-                    <view class="apply-btn trial-btn" @click="applyTrial">
-                      <text class="apply-text">🎯 申请试用</text>
-                    </view>
-                    <view class="apply-btn open-btn" @click="applyOpen(1)">
-                      <text class="apply-text">⚡ 开通一天</text>
-                    </view>
-                    <view class="apply-btn open-btn-month" @click="applyOpen(30)">
-                      <text class="apply-text">🔥 开通一个月</text>
-                    </view>
-                  </view>
-                </view>
-              </view>
-              
-              <!-- 功能说明 -->
-              <view class="config-item">
-                <view class="item-header">
-                  <view class="item-icon">📋</view>
-                  <text class="item-title">功能说明</text>
-                </view>
-                <view class="description-content">
-                  <text class="description-text">{{ configInfo.outbet_desc || '暂无说明' }}</text>
-                </view>
-              </view>
-            </view>
-          </view>
-        </view>
-      </template>
-
-      <!-- 配置列表 -->
-      <view class="config-list">
-        <view v-for="(item,index) in list" :key="index" class="config-item">
-          <!-- 配置头部 -->
-          <view class="config-header">
-            <view class="config-name">
-              <text class="name-text">{{ item.name }}</text>
-              <view class="status-badge" :class="item.enabled == 1 ? 'status-enabled' : 'status-disabled'">
-                {{ item.enabled == 1 ? '启用' : '禁用' }}
-              </view>
-            </view>
-            <view class="config-type">{{ getTypeLabel(item.type) }}</view>
-          </view>
-          
-          <!-- 配置详情 -->
-          <view class="config-details">
-            <view class="detail-row">
-              <text class="label">盘口账号：</text>
-              <text class="value">{{ item.username }}</text>
-            </view>
-            <view class="detail-row">
-              <text class="label">在线状态：</text>
-              <view class="online-status" :class="item.online == 1 ? 'online' : 'offline'">
-                {{ item.online == 1 ? '在线' : '离线' }}
-              </view>
-            </view>
-            <view class="detail-row">
-              <text class="label">余额/未结/盈亏：</text>
-              <text class="value account-info">
-                {{ item.balance || '0' }}/{{ item.unsettle || '0' }}/<text :class="getProfitClass(item.sy)">{{ item.sy || '0' }}</text>
-              </text>
-            </view>
-            <view class="detail-row" v-if="item.start_money > 0">
-              <text class="label">起飞金额：</text>
-              <text class="value">{{ item.start_money }}元</text>
-            </view>
-            <view class="detail-row" v-if="item.chai_money > 0">
-              <text class="label">大额分投：</text>
-              <text class="value">{{ item.chai_money }}元</text>
-            </view>
-            <view class="detail-row" v-if="item.gidsname">
-              <text class="label">游戏：</text>
-              <text class="value game-names">{{ item.gidsname }}</text>
-            </view>
-            <view class="detail-row" v-if="item.urls">
-              <text class="label">网址：</text>
-              <text class="value url-names">{{ item.urls }}</text>
             </view>
           </view>
           
-          <!-- 操作按钮 -->
-          <view class="config-actions">
-            <u-button @click="viewConfig(item)" size="mini" type="info" plain>查看</u-button>
-            <u-button @click="editConfig(item)" size="mini" type="primary" plain>修改</u-button>
-            <u-button @click="toggleStatus(item)" size="mini" :type="item.enabled == 1 ? 'warning' : 'success'" plain>
-              {{ item.enabled == 1 ? '停用' : '启用' }}
-            </u-button>
-            <u-button @click="deleteConfig(item)" size="mini" type="error" plain>删除</u-button>
+          <!-- 试用信息 -->
+          <view v-if="Number(configInfo.outbet_sy_count) > 0" class="config-item dual-layout">
+            <!-- 左侧：试用说明区域 -->
+            <view class="left-section">
+              <view class="section-header">
+                <view class="item-icon">⏰</view>
+                <text class="section-title">试用说明</text>
+              </view>
+              <view class="trial-content">
+                <text class="trial-info">
+                  每天可以试用{{ configInfo.outbet_sy_count }}次，每次可以试用{{ configInfo.outbet_sy_time }}分钟
+                </text>
+              </view>
+            </view>
+            
+            <!-- 右侧：操作按钮区域 -->
+            <view class="right-section">
+              <view class="section-header">
+                <view class="item-icon">🚀</view>
+                <text class="section-title">快速操作</text>
+              </view>
+              <view class="trial-buttons">
+                <view class="apply-btn trial-btn" @click="applyTrial">
+                  <text class="apply-text">🎯 申请试用</text>
+                </view>
+                <view class="apply-btn open-btn" @click="applyOpen(1)">
+                  <text class="apply-text">⚡ 开通一天</text>
+                </view>
+                <view class="apply-btn open-btn-month" @click="applyOpen(30)">
+                  <text class="apply-text">🔥 开通一个月</text>
+                </view>
+              </view>
+            </view>
           </view>
         </view>
       </view>
-    </z-paging>
+    </view>
+
+    <!-- 配置列表 -->
+    <view class="config-list">
+      <!-- 空状态提示 -->
+      <view v-if="list.length === 0" class="empty-state">
+        <text class="empty-text">暂无配置数据</text>
+      </view>
+      
+      <!-- 配置项列表 -->
+      <view v-for="(item,index) in list" :key="index" class="config-item">
+        <!-- 配置头部 -->
+        <view class="config-header">
+          <view class="config-name">
+            <text class="name-text">{{ item.name }}</text>
+            <view class="status-badge" :class="item.enabled == 1 ? 'status-enabled' : 'status-disabled'">
+              {{ item.enabled == 1 ? '启用' : '禁用' }}
+            </view>
+          </view>
+          <view class="config-type">{{ getTypeLabel(item.type) }}</view>
+        </view>
+        
+        <!-- 配置详情 -->
+        <view class="config-details">
+          <view class="detail-row">
+            <text class="label">盘口账号：</text>
+            <text class="value">{{ item.username }}</text>
+          </view>
+          <view class="detail-row">
+            <text class="label">在线状态：</text>
+            <view class="online-status" :class="item.online == 1 ? 'online' : 'offline'">
+              {{ item.online == 1 ? '在线' : '离线' }}
+            </view>
+          </view>
+          <view class="detail-row">
+            <text class="label">余额/未结/盈亏：</text>
+            <text class="value account-info">
+              {{ item.balance || '0' }}/{{ item.unsettle || '0' }}/<text :class="getProfitClass(item.sy)">{{ item.sy || '0' }}</text>
+            </text>
+          </view>
+          <view class="detail-row" v-if="item.start_money > 0">
+            <text class="label">起飞金额：</text>
+            <text class="value">{{ item.start_money }}元</text>
+          </view>
+          <view class="detail-row" v-if="item.chai_money > 0">
+            <text class="label">大额分投：</text>
+            <text class="value">{{ item.chai_money }}元</text>
+          </view>
+          <view class="detail-row" v-if="item.gidsname">
+            <text class="label">游戏：</text>
+            <text class="value game-names">{{ item.gidsname }}</text>
+          </view>
+          <view class="detail-row" v-if="item.urls">
+            <text class="label">网址：</text>
+            <text class="value url-names">{{ item.urls }}</text>
+          </view>
+        </view>
+        
+        <!-- 操作按钮 -->
+        <view class="config-actions">
+          <u-button @click="viewConfig(item)" size="mini" type="info" plain>查看</u-button>
+          <u-button @click="editConfig(item)" size="mini" type="primary" plain>修改</u-button>
+          <u-button @click="toggleStatus(item)" size="mini" :type="item.enabled == 1 ? 'warning' : 'success'" plain>
+            {{ item.enabled == 1 ? '停用' : '启用' }}
+          </u-button>
+          <u-button @click="deleteConfig(item)" size="mini" type="error" plain>删除</u-button>
+        </view>
+      </view>
+    </view>
 
     <!-- 配置详情弹窗 -->
     <u-popup :show="showDetailPopup" mode="bottom" height="600rpx" :border-radius="20" @close="showDetailPopup = false" :safe-area-inset-bottom="true">
@@ -389,6 +377,8 @@ export default {
             showTrialSection: this.configInfo.outbet_sy_count > 0
           });
           this.updateRemainingTime();
+          // 获取配置列表
+          this.getOutbetList();
         } else {
           console.warn('⚠️ 获取配置信息失败:', res.msg);
         }
@@ -406,15 +396,17 @@ export default {
           outbet_sy_time: 30
         };
         this.updateRemainingTime();
+        // 获取配置列表
+        this.getOutbetList();
       });
     },
 
     // 查询列表
-    queryList(pageNo, pageSize) {
+    getOutbetList() {
       console.log('📡 开始查询配置列表...');
       this.$u.api.agent.getOutbetList({
-        page: pageNo,
-        limit: pageSize
+        page: 1,
+        limit: 50 // 弹窗模式下不需要分页，一次加载所有数据
       }).then(res => {
         console.log('📡 配置列表响应:', res);
         if (res.status === 200 || res.code === 1) {
@@ -431,14 +423,14 @@ export default {
             listData = res.data;
           }
           console.log('✅ 配置列表数据:', listData);
-          this.$refs.paging.complete(listData);
+          this.list = listData;
         } else {
           console.warn('⚠️ 获取配置列表失败:', res.msg);
-          this.$refs.paging.complete(false);
+          this.list = [];
         }
       }).catch(err => {
         console.error('❌ 获取配置列表出错:', err);
-        this.$refs.paging.complete(false);
+        this.list = [];
       });
     },
 
@@ -563,7 +555,7 @@ export default {
             title: '删除成功',
             icon: 'success'
           });
-          this.$refs.paging.reload();
+          this.getOutbetList();
         } else {
           uni.showToast({
             title: res.msg || '删除失败',
@@ -806,14 +798,11 @@ export default {
   
   // 弹窗模式下的样式调整
   &.popup-mode {
-    height: auto;
-    min-height: calc(100% - 60rpx); // 减去父弹窗标题栏高度
-    
-    // 确保z-paging组件不会超出弹窗范围
-    ::v-deep .z-paging {
-      height: auto !important;
-      max-height: calc(100vh - 120rpx); // 减去标题栏和一些边距
-    }
+    height: 100%;
+    background: #f5f5f5;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 }
 
@@ -821,17 +810,23 @@ export default {
 .config-info-section {
   padding: 20rpx;
   background: #f5f5f5;
+  flex-shrink: 0; // 在弹窗模式下不缩小
+  
+  // 弹窗模式下保持精致设计，适当缩小
+  .popup-mode & {
+    padding: 15rpx; // 从20rpx缩小
+    flex: 0 0 auto;
+  }
   
   .config-info-card {
-    background: white;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-radius: 16rpx;
     overflow: hidden;
-    box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+    box-shadow: 0 6rpx 28rpx rgba(102, 126, 234, 0.25);
+    color: #fff;
     
     .config-header-info {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 30rpx;
-      color: white;
+      padding: 20rpx 25rpx;
       
       .config-title {
         display: flex;
@@ -839,52 +834,91 @@ export default {
         align-items: center;
         
         .title-text {
-          font-size: 36rpx;
+          font-size: 30rpx;
           font-weight: bold;
+          color: #fff;
         }
         
         .switch-status {
-          display: flex;
-          align-items: center;
-          padding: 12rpx 20rpx;
-          border-radius: 50rpx;
+          padding: 8rpx 20rpx;
+          border-radius: 30rpx;
+          font-size: 28rpx;
+          font-weight: 500;
+          border: 2rpx solid rgba(255, 255, 255, 0.4);
           cursor: pointer;
           transition: all 0.3s ease;
+          user-select: none;
+          display: flex;
+          align-items: center;
+          gap: 8rpx;
           
-          &.switch-on {
-            background: rgba(76, 175, 80, 0.2);
-            border: 2rpx solid #4CAF50;
+          &:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.6);
           }
           
-          &.switch-off {
-            background: rgba(244, 67, 54, 0.2);
-            border: 2rpx solid #f44336;
+          &:active {
+            transform: scale(0.95);
           }
           
           .switch-icon {
             font-size: 24rpx;
-            margin-right: 8rpx;
+            filter: grayscale(1) brightness(10);
           }
           
           .switch-text {
-            font-size: 24rpx;
-            font-weight: bold;
-            margin-right: 8rpx;
+            font-weight: 600;
           }
           
           .click-hint {
-            font-size: 20rpx;
-            opacity: 0.8;
+            font-size: 24rpx;
+            opacity: 0.7;
+            margin-left: 4rpx;
+          }
+          
+          &.switch-on {
+            background: rgba(40, 167, 69, 0.25);
+            color: #90EE90;
+            border-color: #90EE90;
+            
+            &:hover {
+              background: rgba(40, 167, 69, 0.35);
+              box-shadow: 0 6rpx 20rpx rgba(40, 167, 69, 0.4);
+            }
+            
+            .switch-icon {
+              color: #90EE90;
+            }
+          }
+          
+          &.switch-off {
+            background: rgba(220, 53, 69, 0.25);
+            color: #FFB6C1;
+            border-color: #FFB6C1;
+            
+            &:hover {
+              background: rgba(220, 53, 69, 0.35);
+              box-shadow: 0 6rpx 20rpx rgba(220, 53, 69, 0.4);
+            }
+            
+            .switch-icon {
+              color: #FFB6C1;
+            }
           }
         }
       }
     }
     
     .config-content {
-      padding: 30rpx;
+      padding: 0 25rpx 20rpx;
       
       .config-item {
-        margin-bottom: 30rpx;
+        margin-bottom: 15rpx;
+        padding: 15rpx;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 12rpx;
+        backdrop-filter: blur(10rpx);
         
         &:last-child {
           margin-bottom: 0;
@@ -892,30 +926,35 @@ export default {
         
         &.dual-layout {
           display: flex;
-          gap: 30rpx;
+          gap: 20rpx;
         }
         
         .left-section, .right-section {
           flex: 1;
-          background: #f8f9fa;
-          border-radius: 12rpx;
-          padding: 24rpx;
+          display: flex;
+          flex-direction: column;
         }
         
-        .section-header, .item-header {
+        .left-section {
+          border-right: 1rpx solid rgba(255, 255, 255, 0.15);
+          padding-right: 20rpx;
+        }
+        
+        .section-header {
           display: flex;
           align-items: center;
-          margin-bottom: 16rpx;
+          margin-bottom: 8rpx;
           
           .item-icon {
-            font-size: 32rpx;
-            margin-right: 12rpx;
+            font-size: 20rpx;
+            margin-right: 8rpx;
+            filter: grayscale(1) brightness(10);
           }
           
-          .section-title, .item-title {
-            font-size: 28rpx;
-            font-weight: bold;
-            color: #333;
+          .section-title {
+            font-size: 22rpx;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
           }
         }
         
@@ -989,7 +1028,7 @@ export default {
           }
         }
         
-        .trial-buttons {
+        .trial-buttons, .open-buttons {
           display: flex;
           flex-direction: column;
           gap: 8rpx;
@@ -1089,6 +1128,16 @@ export default {
 // 配置列表样式
 .config-list {
   padding: 20rpx;
+  flex: 1; // 在弹窗模式下占据剩余空间
+  overflow: auto; // 允许滚动
+  min-height: 300rpx; // 增加最小高度
+  
+  // 弹窗模式下的样式调整
+  .popup-mode & {
+    padding: 10rpx;
+    flex: 1; // 占据剩余所有空间
+    overflow-y: auto; // 允许滚动
+  }
   
   .config-item {
     background: white;

@@ -141,7 +141,7 @@
       <view class="flex-content">
         <view class="main-content">
           <view class="chat-content" v-show="swiperCurrent === 0">
-            <view @scroll="scroll" @scrolltoupper="loadMoreMessages" ref="chat" class="chat-list" :class="{'loading-more': isLoadingMore}">
+            <view @scroll="scroll" @scrolltoupper="loadMoreMessages" @touchstart="onTouchStart" @touchmove="onTouchMove" ref="chat" class="chat-list" :class="{'loading-more': isLoadingMore}">
               <!-- 加载更多指示器 -->
               <view v-if="isLoadingMore" class="loading-more-indicator">
                 <text class="loading-text">加载更多消息...</text>
@@ -330,7 +330,7 @@
                 </view>-->
               </view>
             </u-transition>
-            <view class="icon-to-bottom" @click="toBottom()" v-show="!emojiType && !isAtBottom">
+            <view class="icon-to-bottom" @click="toBottom(150, true, true)" v-show="!emojiType && !isAtBottom">
               <view v-if="unreadCount > 0 && unreadCount < 99" class="unread-message">{{ unreadCount }}</view>
               <view v-if="unreadCount > 99" class="unread-message">99+</view>
             </view>
@@ -492,7 +492,7 @@
       </u-popup>
       
       <!-- 快捷打单配置弹窗 - 简单版本 -->
-      <u-popup :show="isShowFullScreenPanel" mode="center" :closeOnClickOverlay="true" @close="closeBettingCenter" :safeAreaInsetTop="true" :customStyle="{'width':'95%','height':'90%','max-width':'800px','border-radius':'16px'}">
+      <u-popup :show="isShowFullScreenPanel" mode="center" :closeOnClickOverlay="true" @close="closeBettingCenter" :safeAreaInsetTop="true" :customStyle="{'width':'95%','height':'90%','max-width':'800px','border-radius':'16px','overflow':'visible'}">
         <view class="quick-config-panel">
           <view class="quick-config-header">
             <text class="header-title">快捷打单配置</text>
@@ -675,6 +675,14 @@ export default {
       configPageUrl: '', // 打单配置页面URL
       isBettingCenterClosing: false, // 标记是否正在关闭打单中心弹窗
       pendingMessages: [], // 待显示的消息缓存（当不在底部时）
+      lastSyncCheck: 0, // 上次WebSocket状态检测时间
+      recentlyCorrected: false, // 是否最近刚修正过状态
+      lastHealthCheck: 0, // 上次轻量级健康检查时间
+      lastBottomDetection: 0, // 上次检测到底部的时间
+      lastUserInteraction: 0, // 上次用户交互时间
+      isUserScrolling: false, // 是否为用户主动滚动
+      scrollResetTimer: null, // 滚动状态重置定时器
+      lastStateCorrection: 0, // 上次状态修正时间
       isshowright: true,
       isshowpredict: false,
       isclshow: false,
@@ -757,11 +765,15 @@ export default {
     // 页面就绪后检查WebSocket状态
     this.$nextTick(() => {
       setTimeout(() => {
-        this.checkAndSyncWebSocketStatus();
+        // 禁用状态检测，避免误判导致不必要的重连
+        // this.checkAndSyncWebSocketStatus();
       }, 1000);
     });
   },
   onShow(){
+    console.log('🔄 onShow被触发');
+    console.log('👁️ 页面显示状态 - UID:', this.uid, 'UType:', this.utype, 'WebSocket状态:', uni.$socketUtils?.isOpenSocket);
+    console.trace('🚨 onShow调用栈:');
     this.initializePageShow();
   },
   onHide(){
@@ -826,6 +838,7 @@ export default {
     this.uid = this.userInfo.userid;
     this.utype = this.userInfo.type;
     this.gid = uni.getStorageSync('cgid');
+    console.log('🔍 页面初始化 - UID:', this.uid, 'UType:', this.utype, 'UserInfo:', this.userInfo);
     this.template = uni.getStorageSync('ctemplate');
     this.heightArr.statusbarHeight = this.windowObj.statusBarHeight;
     
@@ -867,15 +880,38 @@ export default {
         },1000);
       }
       
+      // 确保清理旧的定时器，防止重复创建
+      if(this.balancetimer){
+        console.log('🧹 清理已存在的balancetimer');
+        clearInterval(this.balancetimer);
+        this.balancetimer = null;
+      }
+      
       if(!this.balancetimer){
+        // 房主账号查询更复杂，微调查询间隔
+        const queryInterval = this.utype === 1 ? 10000 : 8000; // 房主10秒，会员8秒
+        console.log(`🕐 设置定时查询间隔: ${queryInterval/1000}秒 (用户类型: ${this.utype})`);
         this.balancetimer = setInterval(() => {
+          console.log(`⏰ 定时器触发 - 类型:${this.utype}, ID:${this.balancetimer}`);
           if(!this.isDestroyed && uni.$socketUtils.isOpenSocket){
-            uni.$socketUtils.send({eventType:"getBalanceInfo"});
-            uni.$socketUtils.send({eventType:"periodListOrSingle"});
-            uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+            // 房主账号分散发送消息，避免复杂查询同时触发
+            if (this.utype === 1) {
+              uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+              setTimeout(() => {
+                uni.$socketUtils.send({eventType:"periodListOrSingle"});
+              }, 200);
+              setTimeout(() => {
+                uni.$socketUtils.send({eventType:"getBalanceInfo"});
+              }, 400);
+            } else {
+              // 普通会员正常发送
+              uni.$socketUtils.send({eventType:"getBalanceInfo"});
+              uni.$socketUtils.send({eventType:"periodListOrSingle"});
+              uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+            }
             this.getRoomConfig();
           }
-        },8000);
+        }, queryInterval);
       }
     
     //初始化远程数据
@@ -892,9 +928,22 @@ export default {
       // WebSocket未连接时，等待连接成功事件（新的重连机制会自动重连）
       //console.log('WebSocket未连接，自动重连机制已启动');
     }else{
-      uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
-      uni.$socketUtils.send({eventType:"getBalanceInfo"});
-      uni.$socketUtils.send({eventType:"periodListOrSingle"});
+      // 房主账号延迟并分散发送消息，避免复杂查询同时触发
+      if (this.utype === 1) {
+        console.log('🏠 房主账号onLoad，延迟分散发送WebSocket消息');
+        uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+        setTimeout(() => {
+          uni.$socketUtils.send({eventType:"periodListOrSingle"});
+        }, 500);
+        setTimeout(() => {
+          uni.$socketUtils.send({eventType:"getBalanceInfo"});
+        }, 1000);
+      } else {
+        // 普通会员正常发送
+        uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+        uni.$socketUtils.send({eventType:"getBalanceInfo"});
+        uni.$socketUtils.send({eventType:"periodListOrSingle"});
+      }
     }
     if(this.template == 'SSC'){
       this.keyboardHeight = 210;
@@ -1176,10 +1225,22 @@ export default {
       // 重新加载聊天记录
       this.loadChatRecords();
       
-      // 发送其他必要的请求
-      uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
-      uni.$socketUtils.send({eventType:"getBalanceInfo"});
-      uni.$socketUtils.send({eventType:"periodListOrSingle"});
+      // 发送其他必要的请求 - 应用房主分散发送机制
+      if (this.utype === 1) {
+        console.log('🏠 房主账号syncChatData，延迟分散发送WebSocket消息');
+        uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+        setTimeout(() => {
+          uni.$socketUtils.send({eventType:"periodListOrSingle"});
+        }, 500);
+        setTimeout(() => {
+          uni.$socketUtils.send({eventType:"getBalanceInfo"});
+        }, 1000);
+      } else {
+        // 普通会员正常发送
+        uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+        uni.$socketUtils.send({eventType:"getBalanceInfo"});
+        uni.$socketUtils.send({eventType:"periodListOrSingle"});
+      }
       this.getperiod();
       
       /* uni.showToast({
@@ -1295,12 +1356,53 @@ export default {
       }
     },
     
-    // 检测并同步WebSocket状态
+    // 轻量级连接健康检查（不触发页面重新渲染）
+    lightweightHealthCheck() {
+      // 防抖机制：避免频繁检查
+      const now = Date.now();
+      if (this.lastHealthCheck && (now - this.lastHealthCheck) < 10000) {
+        return; // 10秒内不重复检查
+      }
+      this.lastHealthCheck = now;
+      
+      if (!uni.$socketUtils || !uni.$socketUtils.socketTask) {
+        return;
+      }
+      
+      try {
+        // 检查心跳超时（但不发出事件，只记录日志）
+        const lastHeartbeat = uni.$socketUtils.lastHeartbeatTime;
+        if (lastHeartbeat && (now - lastHeartbeat > 60000)) {
+          console.warn('🔧 轻量级检查：心跳超时超过60秒，可能连接异常');
+          // 不触发重连，让现有的重连机制处理
+        }
+        
+        // 检查连接时长，记录连接稳定性
+        const connectionStartTime = uni.$socketUtils.connectionStartTime;
+        if (connectionStartTime) {
+          const uptime = now - connectionStartTime;
+          if (uptime > 300000) { // 5分钟以上的连接
+            console.log(`📊 连接稳定性良好，已连接 ${Math.floor(uptime/60000)} 分钟`);
+          }
+        }
+      } catch (error) {
+        console.error('轻量级健康检查出错:', error);
+      }
+    },
+    
+    // 检测并同步WebSocket状态（已禁用，避免页面重新渲染）
     checkAndSyncWebSocketStatus() {
       // 防闪烁检查：如果打单中心正在关闭，跳过状态检测
       if (this.isBettingCenterClosing) {
         return;
       }
+      
+      // 防抖机制：避免频繁检测和修正，减少页面重新渲染
+      const now = Date.now();
+      if (this.lastSyncCheck && (now - this.lastSyncCheck) < 3000) {
+        return; // 3秒内不重复检测
+      }
+      this.lastSyncCheck = now;
       
       if (!uni.$socketUtils) {
         return;
@@ -1363,8 +1465,13 @@ export default {
             uni.$socketUtils.isOpenSocket = shouldBeOpen;
             
             // 如果实际是连接状态但标志为false，发出连接成功事件
-            if (shouldBeOpen && !currentIsOpenSocket) {
+            // 但不要频繁发出，避免触发页面重新渲染
+            if (shouldBeOpen && !currentIsOpenSocket && !this.recentlyCorrected) {
               console.log('🔄 修正WebSocket状态为已连接，发出连接事件');
+              this.recentlyCorrected = true;
+              setTimeout(() => {
+                this.recentlyCorrected = false;
+              }, 5000); // 5秒内不重复修正
               uni.$emit("websocketopen", { corrected: true });
             }
           }
@@ -1441,7 +1548,9 @@ export default {
     // WebSocket连接成功
     onWebSocketOpen(res) {
       this.safeExecute(() => {
-        //console.log('🔌 WebSocket连接成功，准备加载数据');
+        console.log('🔌 onWebSocketOpen被调用，参数:', res);
+        console.log('👤 用户信息 - ID:', this.uid, '类型:', this.utype, '(0=会员,1=管理员)');
+        console.trace('🚨 onWebSocketOpen调用栈:');
         
         // 防闪烁检查：如果打单中心正在关闭，跳过数据加载
         if (this.isBettingCenterClosing) {
@@ -1455,32 +1564,65 @@ export default {
         if(isFirstLoad){
           //console.log('📥 首次连接，仅发送基础请求');
           this.reloadflag = false;
-          uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
-          uni.$socketUtils.send({eventType:"getBalanceInfo"});
-          uni.$socketUtils.send({eventType:"periodListOrSingle"});
+          // 房主账号延迟并分散发送消息，避免复杂查询同时触发
+          if (this.utype === 1) {
+            console.log('🏠 房主账号首次连接，延迟分散发送WebSocket消息');
+            uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+            setTimeout(() => {
+              uni.$socketUtils.send({eventType:"periodListOrSingle"});
+            }, 500);
+            setTimeout(() => {
+              uni.$socketUtils.send({eventType:"getBalanceInfo"});
+            }, 1000);
+          } else {
+            // 普通会员正常发送
+            uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+            uni.$socketUtils.send({eventType:"getBalanceInfo"});
+            uni.$socketUtils.send({eventType:"periodListOrSingle"});
+          }
           return;
         }
         
         // 重连场景：需要重新加载聊天记录
         //console.log('🔄 WebSocket重连成功，重新加载聊天记录');
         
-        // 清空当前聊天记录
-        this.chatList = [];
-        
-        // 重置分页状态
-        this.hasMoreMessages = true;
-        this.isLoadingMore = false;
-        this.nextLastId = null;
-        this.lastScrollPosition = null;
-        this.unreadCount = 0;
-        
-        // 重新加载聊天记录
-        this.loadChatRecords();
+        // WebSocket重连时，只有在用户在底部时才清空并重新加载聊天记录
+        if (this.isAtBottom) {
+          console.log('🔌 WebSocket重连且用户在底部，清空并重新加载聊天记录');
+          
+          // 清空当前聊天记录
+          this.chatList = [];
+          
+          // 重置分页状态
+          this.hasMoreMessages = true;
+          this.isLoadingMore = false;
+          this.nextLastId = null;
+          this.lastScrollPosition = null;
+          this.unreadCount = 0;
+          
+          this.loadChatRecords(false, false);
+        } else {
+          console.log('🔌 WebSocket重连但用户不在底部，保持当前聊天记录');
+          // 用户在查看历史消息，保持当前数据不变
+        }
         
         // 发送其他必要的请求
-        uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
-        uni.$socketUtils.send({eventType:"getBalanceInfo"});
-        uni.$socketUtils.send({eventType:"periodListOrSingle"});
+        // 房主账号延迟并分散发送消息，避免复杂查询同时触发
+        if (this.utype === 1) {
+          console.log('🏠 房主账号，延迟分散发送WebSocket消息');
+          uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+          setTimeout(() => {
+            uni.$socketUtils.send({eventType:"periodListOrSingle"});
+          }, 500);
+          setTimeout(() => {
+            uni.$socketUtils.send({eventType:"getBalanceInfo"});
+          }, 1000);
+        } else {
+          // 普通会员正常发送
+          uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+          uni.$socketUtils.send({eventType:"getBalanceInfo"});
+          uni.$socketUtils.send({eventType:"periodListOrSingle"});
+        }
         this.getperiod();
       });
     },
@@ -1566,9 +1708,9 @@ export default {
               console.log('⚠️ 未找到对应的"发送中"消息，可能是历史消息');
               // 作为新消息处理，继续到统一显示逻辑
             } else {
-              // 确认消息处理完成，滚动到底部
-              if(this.swiperCurrent == 0 && !this.isLoadingMore){
-                this.toBottom();
+              // 确认消息处理完成，滚动到底部（只有在用户确实在底部时）
+              if(this.isAtBottom && this.swiperCurrent == 0 && !this.isLoadingMore){
+                this.toBottom(150, true, false); // 不加载待显示消息，只滚动
               }
               return; // 不添加到聊天列表
             }
@@ -1613,9 +1755,9 @@ export default {
                 console.log('📦 系统回复消息已缓存，未读计数:', this.unreadCount);
               }
               
-              // 滚动到底部
-              if(shouldShowImmediately && this.swiperCurrent == 0 && !this.isLoadingMore){
-                this.toBottom();
+              // 滚动到底部（只有在用户确实在底部时）
+              if(shouldShowImmediately && this.isAtBottom && this.swiperCurrent == 0 && !this.isLoadingMore){
+                this.toBottom(150, true, false); // 不加载待显示消息，只滚动
               }
               return; // 处理完成
             } else {
@@ -1626,9 +1768,9 @@ export default {
               this.tmpToButomFlag = false;
               !data.other?.openResult && uni.$socketUtils.send({eventType:"getBalanceInfo"});
               
-              // 滚动到底部
-              if(this.swiperCurrent == 0 && !this.isLoadingMore){
-                this.toBottom();
+              // 滚动到底部（只有在用户确实在底部时）
+              if(this.isAtBottom && this.swiperCurrent == 0 && !this.isLoadingMore){
+                this.toBottom(150, true, false); // 不加载待显示消息，只滚动
               }
               return;
             }
@@ -1688,9 +1830,9 @@ export default {
           }
         }
         
-        // 只有在应该立即显示且不是在加载更多时才自动滚动到底部
-        if(shouldShowImmediately && this.swiperCurrent == 0 && !this.isLoadingMore && !this.tmpToButomFlag){
-          this.toBottom();
+        // 只有在应该立即显示且用户确实在底部时才自动滚动到底部
+        if(shouldShowImmediately && this.isAtBottom && this.swiperCurrent == 0 && !this.isLoadingMore && !this.tmpToButomFlag){
+          this.toBottom(150, true, false); // 不加载待显示消息，只滚动
         }
         
         if(data.other.openResult && data.other.openResult == 1){
@@ -2193,7 +2335,7 @@ export default {
       let msgid = this.$u.guid(20);
       let msgitem = {avatar:this.avatar,chatType:'text',content:str,nickname:'发送中',sender:this.uid,msgid:msgid};
       this.chatList.push(msgitem);
-      this.toBottom();
+      this.toBottom(150, true, false); // 用户发送消息，只滚动到底部，不加载历史待显示消息
       
       // 发送下注消息（包含msgid）
       let that = this;
@@ -2233,7 +2375,7 @@ export default {
     },
     switchSwiper(){
       this.swiperCurrent = 0;
-      this.toBottom();
+      this.toBottom(150, true, true); // 用户切换标签页，加载待显示消息
     },
     tabsel(index) {
       if(index !== this.tabclassIndex){
@@ -2241,6 +2383,16 @@ export default {
         this.selectedPlays = [];
       }
       this.tabclassIndex = index;
+    },
+    // 用户触摸开始 - 标记用户开始交互
+    onTouchStart(e) {
+      this.lastUserInteraction = Date.now();
+      this.isUserScrolling = true;
+    },
+    // 用户触摸移动 - 更新用户交互时间
+    onTouchMove(e) {
+      this.lastUserInteraction = Date.now();
+      this.isUserScrolling = true;
     },
     scroll(e){
       //console.log(s.scrollHeight,s.scrollTop,s.offsetHeight);
@@ -2255,10 +2407,51 @@ export default {
         // 更新最后滚动时间
         this.lastScrollTime = Date.now();
         
+        const previousIsAtBottom = this.isAtBottom;
         this.isAtBottom =  s.scrollHeight - s.offsetHeight - s.scrollTop - s.offsetTop < 50;
-        if(this.isAtBottom){
+        
+        // 严格的用户交互检测，避免DOM更新引起的误判
+        const now = Date.now();
+        if(this.isAtBottom && !previousIsAtBottom){
+          // 多重防误判检查：
+          const timeSinceLastDetection = now - this.lastBottomDetection;
+          const timeSinceUserInteraction = now - this.lastUserInteraction;
+          
+          // 只有满足以下条件才认为是真正的用户滚动：
+          // 1. 距离上次检测超过1秒（防抖）
+          // 2. 最近2秒内有用户触摸交互
+          // 3. 当前标记为用户滚动状态
+          const hasValidScrollGesture = timeSinceLastDetection > 1000;
+          const hasRecentUserInteraction = timeSinceUserInteraction < 2000;
+          const isConfirmedUserScroll = this.isUserScrolling && hasRecentUserInteraction;
+          
+          if (hasValidScrollGesture && isConfirmedUserScroll && this.pendingMessages.length > 0) {
+            console.log('📥 确认用户主动滚动到底部，加载待显示消息');
+            this.lastBottomDetection = now;
+            this.unreadCount = 0;
+            this.chatList = this.chatList.concat(this.pendingMessages);
+            this.pendingMessages = [];
+            this.isUserScrolling = false; // 重置用户滚动状态
+          } else if (hasValidScrollGesture && isConfirmedUserScroll) {
+            // 用户滚动到底部但没有待显示消息，只清零计数
+            this.lastBottomDetection = now;
+            this.unreadCount = 0;
+            this.isUserScrolling = false; // 重置用户滚动状态
+            console.log('📥 用户滚动到底部，无待显示消息');
+          } else {
+            // 疑似系统引起的滚动事件，忽略
+            console.log('🚫 忽略系统引起的滚动事件 - 用户交互检查未通过');
+          }
+        } else if(this.isAtBottom) {
+          // 如果已经在底部，只清零计数，不重复加载消息
           this.unreadCount = 0;
         }
+        
+        // 在滚动结束一定时间后重置用户滚动状态
+        clearTimeout(this.scrollResetTimer);
+        this.scrollResetTimer = setTimeout(() => {
+          this.isUserScrolling = false;
+        }, 500);
         
         // 检查是否滚动到顶部附近，用于触发加载更多
         const isNearTop = s.scrollTop < 50; // 减少触发距离，避免过早触发
@@ -2346,7 +2539,7 @@ export default {
         this.heightArr.keyHeight = 0;
         this.$nextTick(() => {
           this.ismsgfocus = true;
-          this.toBottom(true);
+          this.toBottom(150, true, true); // 用户点击闲聊，加载待显示消息
         })
         return;
       }
@@ -2398,9 +2591,9 @@ export default {
         this.heightArr.bottomHeight = this.heightArr.bottomHeight+this.heightArr.keyHeight;
       }
       
-      // 只有不是在加载更多时才滚动到底部
+      // 只有不是在加载更多时才滚动到底部（键盘操作不加载待显示消息）
       if (!this.isLoadingMore) {
-        this.toBottom(150);
+        this.toBottom(150, true, false); // 键盘操作不加载待显示消息，只滚动
       }
     },
     
@@ -2418,14 +2611,18 @@ export default {
       }
     },
     
-    toBottom(duration = 150, smooth = true){
+    toBottom(duration = 150, smooth = true, shouldLoadPending = false){
       // 如果正在加载更多，不执行滚动到底部
       if (this.isLoadingMore) {
         return;
       }
       
-      // 加载待显示的消息
-      this.loadPendingMessages();
+      // console.log('🎯 toBottom被调用:', {duration, smooth, shouldLoadPending, isAtBottom: this.isAtBottom});
+      
+      // 只有在明确指定时才加载待显示的消息（避免误触发）
+      if (shouldLoadPending) {
+        this.loadPendingMessages();
+      }
       
       // 更新最后滚动时间
       this.updateLastScrollTime();
@@ -2460,8 +2657,8 @@ export default {
       })
     },
     timerCheck(){
-      // 检测WebSocket真实连接状态
-      this.checkAndSyncWebSocketStatus();
+      // 禁用会导致页面重新渲染的状态检测，但保留重连机制
+      // this.checkAndSyncWebSocketStatus(); // 这个函数会触发页面重新渲染，暂时禁用
       
       //判断websocket是否连接
       if(!uni.$socketUtils.isOpenSocket){
@@ -2470,6 +2667,34 @@ export default {
         
         // 触发重连机制（如果websocketUtils支持且未在重连中）
         if(uni.$socketUtils && typeof uni.$socketUtils.debouncedReconnect === 'function') {
+          // 检查WebSocket实际状态，避免误判
+          const hasSocketTask = uni.$socketUtils.socketTask;
+          const isActuallyConnected = hasSocketTask && 
+            (typeof hasSocketTask.readyState === 'undefined' || hasSocketTask.readyState === 1);
+          
+          // 如果实际上是连接的，修正状态而不是重连
+          if (isActuallyConnected) {
+            const now = Date.now();
+            
+            // 防抖：10秒内不重复修正状态，避免频繁修正
+            if (now - this.lastStateCorrection < 10000) {
+              return; // 最近修正过，跳过本次修正
+            }
+            
+            console.log('🔄 timerCheck发现状态不同步，仅修正状态，不触发事件');
+            
+            // 静默修正状态，不触发任何事件或回调
+            uni.$socketUtils.isOpenSocket = true;
+            this.lastStateCorrection = now;
+            
+            // 只有在真正显示错误提示时才隐藏，避免不必要的DOM变化
+            if (this.showWebSocketError) {
+              this.showWebSocketError = false;
+            }
+            
+            return; // 修正状态后直接返回，不触发重连
+          }
+          
           // 检查是否在重连中，如果超过30秒还在重连中，可能重连卡住了，强制重置
           const isReconnectingTooLong = uni.$socketUtils.isReconnecting && 
             (Date.now() - (uni.$socketUtils.lastReconnectTime || 0)) > 30000;
@@ -2481,16 +2706,31 @@ export default {
               uni.$socketUtils.reconnectLock = false;
             }
             
-            console.log('⚠️ timerCheck检测到WebSocket断开，触发重连');
+            console.log('⚠️ timerCheck检测到WebSocket真正断开，触发重连');
             
-            // 确保关键状态允许重连
-            if (uni.$socketUtils.isUserClose || !uni.$socketUtils.shouldAutoReconnect) {
-              console.log('⚠️ 重连被阻止，重置状态');
+            // 强制重置所有可能阻止重连的状态
+            const wasBlocked = uni.$socketUtils.isUserClose || !uni.$socketUtils.shouldAutoReconnect || 
+                               uni.$socketUtils.disableAutoReconnect || uni.$socketUtils.isUserExitApp;
+            
+            if (wasBlocked) {
+              console.log('⚠️ 重连被阻止，强制重置所有状态', {
+                isUserClose: uni.$socketUtils.isUserClose,
+                shouldAutoReconnect: uni.$socketUtils.shouldAutoReconnect,
+                disableAutoReconnect: uni.$socketUtils.disableAutoReconnect,
+                isUserExitApp: uni.$socketUtils.isUserExitApp
+              });
+              
+              // 强制重置所有状态
               uni.$socketUtils.isUserClose = false;
               uni.$socketUtils.shouldAutoReconnect = true;
+              uni.$socketUtils.disableAutoReconnect = false;
+              uni.$socketUtils.isUserExitApp = false;
+              uni.$socketUtils.isReconnecting = false;
+              uni.$socketUtils.reconnectLock = false;
             }
             
-            uni.$socketUtils.debouncedReconnect('timer_check_disconnected');
+            // 强制立即重连，跳过防抖
+            uni.$socketUtils.debouncedReconnect('timer_check_disconnected', true);
           }
         }
         
@@ -2498,6 +2738,9 @@ export default {
       } else {
         // WebSocket已连接，隐藏错误提示
         this.showWebSocketError = false;
+        
+        // 轻量级连接健康检查（不触发页面重新渲染）
+        this.lightweightHealthCheck();
       }
       if(this.curtime.stopstatus === 1){
         return;
@@ -2608,7 +2851,7 @@ export default {
       let that = this;
       this.$u.api.member.quickPlayDetail({gid:this.gid}).then(res => {that.quickPlayDetailData = res.data;}).catch(err => {});
     },
-    loadChatRecords(isLoadMore = false) {
+    loadChatRecords(isLoadMore = false, shouldLoadPending = true) {
       const params = {
         pageSize: this.pageSize,
         gid: this.gid
@@ -2678,8 +2921,8 @@ export default {
           const reversedMessages = [...newMessages].reverse();
           that.chatList = reversedMessages;
           
-          // 首次加载后滚动到底部
-          that.toBottom(150, false);
+          // 首次加载后滚动到底部，根据参数决定是否加载待显示消息
+          that.toBottom(150, false, shouldLoadPending);
         }
         
         // 更新nextLastId和hasMoreMessages状态
@@ -2727,9 +2970,9 @@ export default {
         this.heightArr.keyHeight = res.height;
       }
       
-      // 只有不是在加载更多时才滚动到底部
+      // 只有不是在加载更多时才滚动到底部（键盘高度变化不加载待显示消息）
       if (!this.isLoadingMore) {
-        this.toBottom(150);
+        this.toBottom(150, true, false); // 键盘高度变化不加载待显示消息，只滚动
       }
     },
     sendevent() {
@@ -2744,7 +2987,7 @@ export default {
       this.tmpToButomFlag = true;let msgid = this.$u.guid(20);
       let msgitem = {avatar:this.avatar,chatType:'text',content:this.sendmsg,nickname:'发送中',sender:this.uid,msgid:msgid};
       this.chatList.push(msgitem);
-      this.toBottom();let that = this;
+      this.toBottom(150, true, false);let that = this; // 用户发送消息，只滚动到底部，不加载历史待显示消息
       setTimeout(function (){
         uni.$socketUtils.send({eventType:"gamechat",gid:that.gid,content:that.sendmsg,msgid:msgid});
       },50);
@@ -2879,11 +3122,27 @@ export default {
     
     // 提取onShow的逻辑到单独方法，避免直接调用生命周期钩子
     initializePageShow() {
+      console.log('🔄 initializePageShow被调用');
       if(this.isFirstLoad){
         this.isFirstLoad = false;
+        console.log('🔄 首次加载，确保WebSocket连接正常');
+        
+        // 首次加载时，检查WebSocket状态，如果未连接则强制连接
+        if (!uni.$socketUtils.isOpenSocket) {
+          console.log('🔌 首次加载检测到WebSocket未连接，强制初始化连接');
+          // 重置所有可能的阻止标志
+          uni.$socketUtils.isUserClose = false;
+          uni.$socketUtils.shouldAutoReconnect = true;
+          uni.$socketUtils.disableAutoReconnect = false;
+          uni.$socketUtils.isUserExitApp = false;
+          uni.$socketUtils.isReconnecting = false;
+          uni.$socketUtils.reconnectLock = false;
+          
+          // 立即初始化连接
+          uni.$socketUtils.initConnection(true);
+        }
         return;
       }
-      //console.log('initializePageShow');
       if(this.previewImageFlag){
         this.previewImageFlag = false;
         return;
@@ -2923,15 +3182,38 @@ export default {
         },1000);
       }
       
+      // 确保清理旧的定时器，防止重复创建
+      if(this.balancetimer){
+        console.log('🧹 清理已存在的balancetimer');
+        clearInterval(this.balancetimer);
+        this.balancetimer = null;
+      }
+      
       if(!this.balancetimer){
+        // 房主账号查询更复杂，微调查询间隔
+        const queryInterval = this.utype === 1 ? 10000 : 8000; // 房主10秒，会员8秒
+        console.log(`🕐 设置定时查询间隔: ${queryInterval/1000}秒 (用户类型: ${this.utype})`);
         this.balancetimer = setInterval(() => {
+          console.log(`⏰ 定时器触发 - 类型:${this.utype}, ID:${this.balancetimer}`);
           if(!this.isDestroyed && uni.$socketUtils.isOpenSocket){
-            uni.$socketUtils.send({eventType:"getBalanceInfo"});
-            uni.$socketUtils.send({eventType:"periodListOrSingle"});
-            uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+            // 房主账号分散发送消息，避免复杂查询同时触发
+            if (this.utype === 1) {
+              uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+              setTimeout(() => {
+                uni.$socketUtils.send({eventType:"periodListOrSingle"});
+              }, 200);
+              setTimeout(() => {
+                uni.$socketUtils.send({eventType:"getBalanceInfo"});
+              }, 400);
+            } else {
+              // 普通会员正常发送
+              uni.$socketUtils.send({eventType:"getBalanceInfo"});
+              uni.$socketUtils.send({eventType:"periodListOrSingle"});
+              uni.$socketUtils.send({eventType:"openResult",gid:this.gid});
+            }
             this.getRoomConfig();
           }
-        },8000);
+        }, queryInterval);
       }
       
       // 重新启动聊天记录清理定时器
@@ -4436,8 +4718,7 @@ export default {
   width: 100%;
   height: 100%;
   background: #f5f5f5;
-  display: flex;
-  flex-direction: column;
+  position: relative !important; /* 为绝对定位的标题栏提供定位上下文 */
 }
 
 .quick-config-header {
@@ -4446,7 +4727,13 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 30rpx;
+  padding: 0 20rpx;
+  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
 }
 
 .header-title {
@@ -4466,15 +4753,18 @@ export default {
 }
 
 .quick-config-content {
-  flex: 1;
-  overflow: auto;
-  height: calc(100vh - 60rpx); /* 减去标题栏高度 */
+  position: absolute;
+  top: 60rpx; /* 从标题栏下方开始 */
+  left: 0;
+  right: 0;
+  bottom: 0; /* 占满剩余空间 */
+  overflow: auto; /* 允许滚动 */
+  padding-top: 10rpx;
+  box-sizing: border-box;
+  
+  /* 确保内容不会超出这个区域 */
+  max-height: calc(100% - 60rpx);
 }
 
-/* 弹窗中的组件样式调整 */
-.quick-config-content {
-  flex: 1;
-  overflow: hidden;
-}
 
 </style>

@@ -416,7 +416,7 @@ class websocketUtils {
             // 错误处理
             this.socketTask.onError((res) => {
                 if (!isResolved) {
-                    // console.error('WebSocket连接错误:', res);
+                    console.error('🔥 WebSocket连接错误(建立过程中):', res);
                     isResolved = true;
                     clearTimeout(openTimer);
                     
@@ -468,14 +468,20 @@ class websocketUtils {
             
             // 处理特殊消息类型
             if (json.eventType === 'pong') {
-                // 心跳响应，不需要特殊处理
+                console.log('💚 收到心跳 pong 响应');
+                this.lastHeartbeatTime = Date.now();
+                this.resetHeartbeatTimeout();
                 return;
             }
             
             if (json.eventType === 'timeout') {
-                // console.log('服务器超时，关闭连接并继续重连');
-                // 服务器超时时，直接关闭连接但不设置用户关闭标志，保持重连
+                console.log('⏰ 服务器发送timeout消息，关闭连接并继续重连');
+                console.log('🔍 可能原因：多个标签页导致fd冲突，或网络状态检查失败');
+                
+                // 服务器超时时，强制重置所有状态确保重连
                 this.isOpenSocket = false;
+                this.isReconnecting = false;
+                this.reconnectLock = false;
                 this.clearAllTimers();
                 
                 if (this.socketTask) {
@@ -483,10 +489,15 @@ class websocketUtils {
                 }
                 this.socketTask = null;
                 
-                // 立即触发重连，不清理token
-                if (this.shouldAutoReconnect && !this.isUserClose && !this.isUserExitApp && !this.disableAutoReconnect) {
-                    this.debouncedReconnect('server_timeout', true);
-                }
+                // 强制确保重连状态正确
+                this.isUserClose = false;
+                this.shouldAutoReconnect = true;
+                this.disableAutoReconnect = false;
+                this.isUserExitApp = false;
+                
+                console.log('🔄 timeout后强制立即重连');
+                // 立即触发重连，跳过所有防抖和检查
+                this.debouncedReconnect('server_timeout', true);
                 return;
             }
             
@@ -566,7 +577,8 @@ class websocketUtils {
         this.isOpenSocket = false;
         this.clearAllTimers();
         
-        // console.log('WebSocket连接关闭:', e);
+        console.log('🔴 WebSocket连接关闭:', e);
+        console.log('📊 关闭详情 - 代码:', e?.code, '原因:', e?.reason, '是否意外:', !e?.wasClean);
         
         // 检查是否是特殊关闭原因
         if (e && (e.reason === 'user' || e.reason === 'destroy' || e.reason === 'force_cleanup')) {
@@ -599,6 +611,29 @@ class websocketUtils {
     // 发送消息
     send(value) {
         try {
+            // 记录发送的消息（排除心跳）
+            if (value.eventType !== 'ping') {
+                console.log('📤 发送WebSocket消息:', value.eventType, value);
+                
+                // 统计消息发送频率
+                if (!this.messageStats) {
+                    this.messageStats = {};
+                }
+                const eventType = value.eventType;
+                if (!this.messageStats[eventType]) {
+                    this.messageStats[eventType] = { count: 0, lastTime: 0 };
+                }
+                const now = Date.now();
+                this.messageStats[eventType].count++;
+                this.messageStats[eventType].lastTime = now;
+                
+                // 每10个消息输出一次统计
+                const totalMessages = Object.values(this.messageStats).reduce((sum, stat) => sum + stat.count, 0);
+                if (totalMessages % 10 === 0) {
+                    console.log('📊 消息发送统计:', this.messageStats);
+                }
+            }
+            
             // 自动为所有发送的数据添加token（如果token为空会抛出异常）
             const dataToSend = this.addTokenToData(value);
             
@@ -763,6 +798,7 @@ class websocketUtils {
         
         this.heartbeatInterval = setInterval(() => {
             if (this.isOpenSocket) {
+                console.log('💓 发送心跳 ping');
                 this.send({eventType: "ping"});
                 this.setHeartbeatTimeout();
             }
@@ -777,7 +813,7 @@ class websocketUtils {
     setHeartbeatTimeout() {
         clearTimeout(this.heartbeatTimeoutId);
         this.heartbeatTimeoutId = setTimeout(() => {
-            // console.warn('心跳超时，连接已断开，触发重连');
+            console.warn('💔 心跳超时，连接已断开，触发重连');
             // this.recordError('heartbeat_timeout', new Error('心跳超时'));
             this.isOpenSocket = false;
             this.clearAllTimers();
@@ -836,7 +872,7 @@ class websocketUtils {
         // 彻底清理旧连接和所有定时器
         this.forceCleanupConnection();
         
-        // console.log(`启动重连进程，原因: ${reason}，当前尝试次数: ${this.reconnectAttempts + 1}`);
+        console.log(`🔄 启动重连进程，原因: ${reason}，当前尝试次数: ${this.reconnectAttempts + 1}`);
         
         // 立即尝试重连
         this.executeReconnect(reason);
@@ -862,7 +898,7 @@ class websocketUtils {
         // H5环境下额外检查网络状态
         this.checkNetworkStatus();
         
-        // console.log(`执行重连 (第${this.reconnectAttempts}次)，网络状态: ${this.isNetworkAvailable}，原因: ${reason}`);
+        console.log(`⚡ 执行重连 (第${this.reconnectAttempts}次)，网络状态: ${this.isNetworkAvailable}，原因: ${reason}`);
         
         // 尝试连接（使用自动调用方式）
         this.connectSocketInit().then(() => {
