@@ -316,8 +316,12 @@
                   <image src="/static/image/icon/qiegame.png"></image>
                 </view>
                 <view class="fullscreen-panel span1" @click="showFullScreenPanel">
-                  <image src="/static/image/icon/customer.png"></image>
+                  <text class="betting-icon">⚙️</text>
                   <text class="span1-text">打单配置</text>
+                </view>
+                <view class="user-management span1" @click="showUserManagementPanel">
+                  <text class="user-icon">👥</text>
+                  <text class="span1-text">用户管理</text>
                 </view>
                 <view class="customer span1" @click="customerTo">
                   <image src="/static/image/icon/customer.png"></image>
@@ -512,6 +516,55 @@
         </view>
       </u-popup>
       
+      <!-- 用户管理弹窗 -->
+      <u-popup :show="isShowUserManagementPanel" mode="center" :closeOnClickOverlay="true" @close="closeUserManagementPanel" :safeAreaInsetTop="true" :customStyle="{'width':'95%','height':'95%','max-width':'800px','border-radius':'16px','overflow':'visible'}">
+        <view class="user-management-panel">
+          <view class="user-management-header">
+            <text class="header-title">用户管理</text>
+            <view class="header-close" @click="closeUserManagementPanel">
+              <u-icon name="close" color="#fff" size="20"></u-icon>
+            </view>
+          </view>
+          
+          <!-- Tab 导航 -->
+          <view class="tab-navigation">
+            <view class="tab-item" 
+                  :class="{ active: currentUserTab === 'users' }" 
+                  @click="switchUserTab('users')">
+              <text>用户</text>
+            </view>
+            <view class="tab-item" 
+                  :class="{ active: currentUserTab === 'subaccounts' }" 
+                  @click="switchUserTab('subaccounts')">
+              <text>子账号</text>
+            </view>
+            <view class="tab-item" 
+                  :class="{ active: currentUserTab === 'links' }" 
+                  @click="switchUserTab('links')">
+              <text>链接记录</text>
+            </view>
+          </view>
+          
+          <!-- Tab 内容 -->
+          <view class="user-management-content">
+            <view v-if="currentUserTab === 'users'" class="tab-content">
+              <!-- 用户列表组件 -->
+              <UserListComponent 
+                :showHeader="false"
+                :backUrl="''"
+                :isPopupMode="true"
+              />
+            </view>
+            <view v-if="currentUserTab === 'subaccounts'" class="tab-content placeholder-content">
+              <text class="tab-placeholder">子账号管理功能开发中...</text>
+            </view>
+            <view v-if="currentUserTab === 'links'" class="tab-content placeholder-content">
+              <text class="tab-placeholder">链接记录功能开发中...</text>
+            </view>
+          </view>
+        </view>
+      </u-popup>
+      
       <u-popup :show="msgOrderDetailShow" mode="center" round="8" :customStyle="{'width':'90%'}" :closeOnClickOverlay="true" @close="msgOrderDetailShow = !msgOrderDetailShow">
         <view class="h-table">
           <text class="msgOrderDetailTitle">注单详情</text>
@@ -640,12 +693,14 @@ import {siteConfig} from "../libs/mixin/mixin";
 import CustomCollapse from '@/components/custom-collapse/custom-collapse.vue';
 import CustomCollapseItem from '@/components/custom-collapse/custom-collapse-item.vue';
 import OutbetConfigComponent from '@/components/OutbetConfigComponent.vue';
+import UserListComponent from '@/components/UserListComponent.vue';
 import clipboardUtils from '@/common/clipboardUtils.js';
 export default {
   components: {
     CustomCollapse,
     CustomCollapseItem,
-    OutbetConfigComponent
+    OutbetConfigComponent,
+    UserListComponent
   },
   mixins: [uni.$mymixin],
   data() {
@@ -674,6 +729,8 @@ export default {
       isShowFullScreenPanel: false, // 全屏快捷导航面板
       configPageUrl: '', // 打单配置页面URL
       isBettingCenterClosing: false, // 标记是否正在关闭打单中心弹窗
+      isShowUserManagementPanel: false, // 用户管理面板
+      currentUserTab: 'users', // 当前用户管理标签页
       pendingMessages: [], // 待显示的消息缓存（当不在底部时）
       lastSyncCheck: 0, // 上次WebSocket状态检测时间
       recentlyCorrected: false, // 是否最近刚修正过状态
@@ -3075,6 +3132,19 @@ export default {
       this.isShowFullScreenPanel = !this.isShowFullScreenPanel;
       console.log('🎯 弹窗状态已切换为:', this.isShowFullScreenPanel);
     },
+    showUserManagementPanel() {
+      console.log('👥 点击用户管理按钮，当前状态:', this.isShowUserManagementPanel);
+      this.isShowUserManagementPanel = !this.isShowUserManagementPanel;
+      console.log('👥 用户管理弹窗状态已切换为:', this.isShowUserManagementPanel);
+    },
+    closeUserManagementPanel() {
+      console.log('👥 关闭用户管理弹窗');
+      this.isShowUserManagementPanel = false;
+    },
+    switchUserTab(tab) {
+      console.log('👥 切换用户管理标签页:', tab);
+      this.currentUserTab = tab;
+    },
     
     closeBettingCenter() {
       console.log('🚪 关闭打单中心弹窗，设置保护标志');
@@ -4698,10 +4768,31 @@ export default {
   background: #4CAF50 !important; /* 绿色背景 */
   border-radius: 50%;
   display: flex;
+  
+  .betting-icon {
+    font-size: 30rpx;
+    margin-bottom: 4rpx;
+  }
   flex-direction: column;
   align-items: center;
   justify-content: center;
   position: relative;
+}
+
+/* 用户管理按钮样式 - 绿色背景 */
+.user-management.span1 {
+  background: #4CAF50 !important; /* 绿色背景 */
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  
+  .user-icon {
+    font-size: 30rpx;
+    margin-bottom: 4rpx;
+  }
 }
 
 .span1-text {
@@ -4767,4 +4858,127 @@ export default {
 }
 
 
+/* 用户管理弹窗样式 */
+.user-management-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.user-management-header {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: white;
+  padding: 20rpx 32rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  
+  .header-title {
+    font-size: 32rpx;
+    font-weight: bold;
+  }
+  
+  .header-close {
+    width: 60rpx;
+    height: 60rpx;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+}
+
+.tab-navigation {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  padding: 0 20rpx;
+  height: 80rpx;
+  
+  .tab-item {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    
+    text {
+      font-size: 28rpx;
+      color: #666;
+      font-weight: 500;
+      transition: color 0.3s ease;
+    }
+    
+    &.active {
+      text {
+        color: #4CAF50;
+        font-weight: bold;
+      }
+      
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60rpx;
+        height: 4rpx;
+        background: #4CAF50;
+        border-radius: 2rpx;
+      }
+    }
+    
+    &:hover:not(.active) {
+      text {
+        color: #4CAF50;
+      }
+    }
+  }
+}
+
+.user-management-content {
+  flex: 1 1 auto;  // 🔧 完全占据剩余空间
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;   // 关键：允许flex子项缩小
+  height: 100%;    // 🔧 占满父容器高度
+  
+  .tab-content {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    overflow: visible;
+    max-height: none;
+  }
+  
+  .tab-content.placeholder-content {
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .tab-placeholder {
+    font-size: 28rpx;
+    color: #999;
+    padding: 60rpx 40rpx;
+    text-align: center;
+    background: #f8f9fa;
+    border-radius: 12rpx;
+    border: 2rpx dashed #ddd;
+  }
+}
 </style>

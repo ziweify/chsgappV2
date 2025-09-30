@@ -900,6 +900,23 @@ class websocketUtils {
         
         console.log(`⚡ 执行重连 (第${this.reconnectAttempts}次)，网络状态: ${this.isNetworkAvailable}，原因: ${reason}`);
         
+        // 房主账号重连优化：增加指数退避和最大重连次数限制
+        const maxReconnectAttempts = 100; // 最大重连次数
+        if (this.reconnectAttempts > maxReconnectAttempts) {
+            console.error(`❌ 重连次数超过限制(${maxReconnectAttempts})，停止重连`);
+            this.isReconnecting = false;
+            this.reconnectLock = false;
+            this.shouldAutoReconnect = false;
+            
+            // 显示错误提示
+            uni.showToast({
+                title: '连接异常，请重新进入房间',
+                icon: 'none',
+                duration: 3000
+            });
+            return;
+        }
+        
         // 尝试连接（使用自动调用方式）
         this.connectSocketInit().then(() => {
             // console.log('重连成功');
@@ -908,9 +925,15 @@ class websocketUtils {
         }).catch((error) => {
             // console.error(`重连失败 (尝试${this.reconnectAttempts}次):`, error);
             
-            // 重连失败，延迟后继续重连
+            // 重连失败，使用指数退避算法计算延迟时间
             if (!this.isUserClose && this.shouldAutoReconnect && !this.isUserExitApp && !this.disableAutoReconnect) {
-                // console.log(`${this.reconnectInterval / 1000}秒后继续重连`);
+                // 指数退避：基础间隔 * 2^(重连次数/10)，最大30秒
+                const baseInterval = this.reconnectInterval;
+                const backoffMultiplier = Math.min(Math.pow(2, Math.floor(this.reconnectAttempts / 10)), 15);
+                const delayTime = Math.min(baseInterval * backoffMultiplier, 30000);
+                
+                console.log(`🔄 ${delayTime / 1000}秒后继续重连 (指数退避: ${backoffMultiplier}x)`);
+                
                 this.reconnectTimeOut = setTimeout(() => {
                     if (this.isReconnecting && !this.isUserClose && this.shouldAutoReconnect && !this.isUserExitApp && !this.disableAutoReconnect) {
                         this.executeReconnect('retry_after_failure');
@@ -919,7 +942,7 @@ class websocketUtils {
                         this.reconnectLock = false; // 释放重连锁
                         // console.log('重连过程中被取消或条件不满足');
                     }
-                }, this.reconnectInterval);
+                }, delayTime);
             } else {
                 this.isReconnecting = false;
                 this.reconnectLock = false; // 释放重连锁

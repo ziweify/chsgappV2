@@ -1194,6 +1194,8 @@ export default {
     
     .config-details {
       margin-bottom: 20rpx;
+      min-height: 420rpx;
+      overflow: visible;
       
       .detail-row {
         display: flex;
