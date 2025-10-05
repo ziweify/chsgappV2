@@ -487,7 +487,7 @@ export default {
         this.$emit('addConfig');
       } else {
         // 页面模式下直接跳转
-        uni.$utils.jump('/agent/manage/outbet/addconfig');
+        uni.$utils.jump('agent/manage/outbet/addconfig');
       }
     },
 
@@ -499,13 +499,23 @@ export default {
 
     // 编辑配置
     editConfig(item) {
-      if (this.isPopupMode) {
-        // 弹窗模式下触发事件
-        this.$emit('editConfig', item);
-      } else {
-        // 页面模式下直接跳转
-        uni.$utils.jump('/agent/manage/outbet/addconfig?id=' + item.id);
-      }
+      console.log('🔧 OutbetConfigComponent editConfig 被调用:', item, 'isPopupMode:', this.isPopupMode);
+      
+      // 添加延迟，让用户看到点击效果
+      uni.showLoading({ title: '正在跳转...' });
+      
+      setTimeout(() => {
+        if (this.isPopupMode) {
+          // 弹窗模式下触发事件
+          console.log('🔧 弹窗模式下触发 editConfig 事件');
+          this.$emit('editConfig', item);
+        } else {
+          // 页面模式下直接跳转
+          console.log('🔧 页面模式下直接跳转');
+          uni.$utils.jump('agent/manage/outbet/addconfig?id=' + item.id);
+        }
+        uni.hideLoading();
+      }, 300);
     },
 
     // 编辑当前配置

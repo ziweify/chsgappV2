@@ -3167,21 +3167,92 @@ export default {
     },
     // 处理添加配置事件
     handleAddConfig() {
+      console.log('🔧 处理添加配置事件');
       // 关闭快捷导航弹窗
       this.isShowFullScreenPanel = false;
       // 跳转到添加配置页面
       uni.setStorageSync('backUrl', 'copage/chat');
-      uni.$utils.jump('/agent/manage/outbet/addconfig?from=room');
+      
+      const addUrl = 'agent/manage/outbet/addconfig?from=room';
+      console.log('🔧 准备跳转到添加页面:', addUrl);
+      
+      try {
+        uni.$utils.jump(addUrl);
+        console.log('🔧 添加配置跳转成功');
+      } catch (error) {
+        console.error('🔧 添加配置跳转失败:', error);
+        uni.showToast({
+          title: '跳转失败，请重试',
+          icon: 'none'
+        });
+      }
     },
     
     
     // 处理编辑配置事件
     handleEditConfig(item) {
-      // 关闭快捷导航弹窗
-      this.isShowFullScreenPanel = false;
-      // 跳转到编辑配置页面
-      uni.setStorageSync('backUrl', 'copage/chat');
-      uni.$utils.jump('/agent/manage/outbet/addconfig?id=' + item.id + '&from=room');
+      console.log('🔧 处理编辑配置事件:', item);
+      
+      // 显示加载提示
+      uni.showLoading({ title: '正在跳转到编辑页面...' });
+      
+      // 延迟关闭弹窗和跳转，让用户看到反馈
+      setTimeout(() => {
+        // 关闭快捷导航弹窗
+        this.isShowFullScreenPanel = false;
+        // 跳转到编辑配置页面
+        uni.setStorageSync('backUrl', 'copage/chat');
+        
+        const jumpUrl = 'agent/manage/outbet/addconfig?id=' + item.id + '&from=room';
+        console.log('🔧 准备跳转到编辑页面:', jumpUrl);
+        
+        // 尝试多种跳转方式
+        try {
+          // 方式1：使用uni.$utils.jump (注意：jump方法会自动添加/前缀)
+          console.log('🔧 尝试使用 uni.$utils.jump 跳转');
+          uni.$utils.jump(jumpUrl);
+        } catch (error) {
+          console.error('🔧 uni.$utils.jump 跳转失败:', error);
+          
+          // 方式2：直接使用uni.navigateTo
+          try {
+            console.log('🔧 尝试使用 uni.navigateTo 跳转');
+            uni.navigateTo({
+              url: jumpUrl,
+              success: (res) => {
+                console.log('🔧 uni.navigateTo 跳转成功:', res);
+              },
+              fail: (err) => {
+                console.error('🔧 uni.navigateTo 跳转失败:', err);
+                
+                // 方式3：使用uni.redirectTo
+                console.log('🔧 尝试使用 uni.redirectTo 跳转');
+                uni.redirectTo({
+                  url: jumpUrl,
+                  success: (res) => {
+                    console.log('🔧 uni.redirectTo 跳转成功:', res);
+                  },
+                  fail: (err) => {
+                    console.error('🔧 uni.redirectTo 跳转失败:', err);
+                    uni.showToast({
+                      title: '跳转失败，请重试',
+                      icon: 'none'
+                    });
+                  }
+                });
+              }
+            });
+          } catch (error2) {
+            console.error('🔧 所有跳转方式都失败:', error2);
+            uni.showToast({
+              title: '跳转失败，请重试',
+              icon: 'none'
+            });
+          }
+        }
+        
+        uni.hideLoading();
+      }, 500);
     },
     msgOrderDetail(item,orderShowTtype){
       this.orderShowTtype = orderShowTtype;
