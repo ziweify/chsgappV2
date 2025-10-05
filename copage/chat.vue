@@ -3171,7 +3171,7 @@ export default {
       this.isShowFullScreenPanel = false;
       // 跳转到添加配置页面
       uni.setStorageSync('backUrl', 'copage/chat');
-      uni.$utils.jump('/agent/manage/outbet/outbetadd?from=room');
+      uni.$utils.jump('/agent/manage/outbet/addconfig?from=room');
     },
     
     
@@ -3181,7 +3181,7 @@ export default {
       this.isShowFullScreenPanel = false;
       // 跳转到编辑配置页面
       uni.setStorageSync('backUrl', 'copage/chat');
-      uni.$utils.jump('/agent/manage/outbet/outbetadd?id=' + item.id + '&from=room');
+      uni.$utils.jump('/agent/manage/outbet/addconfig?id=' + item.id + '&from=room');
     },
     msgOrderDetail(item,orderShowTtype){
       this.orderShowTtype = orderShowTtype;

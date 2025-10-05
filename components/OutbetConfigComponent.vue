@@ -1,5 +1,6 @@
 <template>
-  <view class="outbet-config-container" :class="{ 'popup-mode': isPopupMode }">
+  <view class="component-wrapper">
+    <view class="outbet-config-container" :class="{ 'popup-mode': isPopupMode }">
     <!-- 只在非弹窗模式显示标题栏 -->
     <TsCustom v-if="!isPopupMode" :backUrl="backUrl" :isBack="showBackButton" title="打单配置列表">
       <block slot='right'>
@@ -129,7 +130,7 @@
               {{ item.online == 1 ? '在线' : '离线' }}
             </view>
           </view>
-          <view class="detail-row">
+          <view class="detail-row full-width">
             <text class="label">余额/未结/盈亏：</text>
             <text class="value account-info">
               {{ item.balance || '0' }}/{{ item.unsettle || '0' }}/<text :class="getProfitClass(item.sy)">{{ item.sy || '0' }}</text>
@@ -143,11 +144,11 @@
             <text class="label">大额分投：</text>
             <text class="value">{{ item.chai_money }}元</text>
           </view>
-          <view class="detail-row" v-if="item.gidsname">
+          <view class="detail-row full-width" v-if="item.gidsname">
             <text class="label">游戏：</text>
             <text class="value game-names">{{ item.gidsname }}</text>
           </view>
-          <view class="detail-row" v-if="item.urls">
+          <view class="detail-row full-width" v-if="item.urls">
             <text class="label">网址：</text>
             <text class="value url-names">{{ item.urls }}</text>
           </view>
@@ -164,9 +165,10 @@
         </view>
       </view>
     </view>
+  </view>
 
-    <!-- 配置详情弹窗 -->
-    <u-popup :show="showDetailPopup" mode="bottom" height="600rpx" :border-radius="20" @close="showDetailPopup = false" :safe-area-inset-bottom="true">
+  <!-- 配置详情弹窗 -->
+  <u-popup :show="showDetailPopup" mode="bottom" height="600rpx" :border-radius="20" @close="showDetailPopup = false" :safe-area-inset-bottom="true">
       <view class="detail-popup">
         <view class="popup-header">
           <view class="header-left">
@@ -485,7 +487,7 @@ export default {
         this.$emit('addConfig');
       } else {
         // 页面模式下直接跳转
-        uni.$utils.jump('/agent/manage/outbet/outbetadd');
+        uni.$utils.jump('/agent/manage/outbet/addconfig');
       }
     },
 
@@ -502,7 +504,7 @@ export default {
         this.$emit('editConfig', item);
       } else {
         // 页面模式下直接跳转
-        uni.$utils.jump('/agent/manage/outbet/outbetadd?id=' + item.id);
+        uni.$utils.jump('/agent/manage/outbet/addconfig?id=' + item.id);
       }
     },
 
@@ -792,17 +794,22 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.component-wrapper {
+  height: 100%;
+  width: 100%;
+}
+
 .outbet-config-container {
   height: 100%;
   background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   
   // 弹窗模式下的样式调整
   &.popup-mode {
     height: 100%;
     background: #f5f5f5;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
   }
 }
 
@@ -1127,31 +1134,43 @@ export default {
 
 // 配置列表样式
 .config-list {
-  padding: 20rpx;
-  flex: 1; // 在弹窗模式下占据剩余空间
-  overflow: auto; // 允许滚动
-  min-height: 300rpx; // 增加最小高度
+  padding: 15rpx;
+  flex: 1; // 占据剩余所有空间
+  overflow-y: auto; // 允许垂直滚动
+  background: #f5f5f5;
   
   // 弹窗模式下的样式调整
   .popup-mode & {
     padding: 10rpx;
-    flex: 1; // 占据剩余所有空间
-    overflow-y: auto; // 允许滚动
+  }
+  
+  .empty-state {
+    padding: 100rpx 20rpx;
+    text-align: center;
+    
+    .empty-text {
+      font-size: 28rpx;
+      color: #999;
+    }
   }
   
   .config-item {
     background: white;
-    border-radius: 16rpx;
-    margin-bottom: 20rpx;
-    padding: 30rpx;
-    box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+    border-radius: 12rpx;
+    margin-bottom: 15rpx;
+    padding: 15rpx;
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
+    
+    // 确保item能完整显示所有内容
+    height: auto;
+    overflow: visible;
     
     .config-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20rpx;
-      padding-bottom: 20rpx;
+      margin-bottom: 8rpx;
+      padding-bottom: 8rpx;
       border-bottom: 1rpx solid #f0f0f0;
       
       .config-name {
@@ -1159,16 +1178,16 @@ export default {
         align-items: center;
         
         .name-text {
-          font-size: 32rpx;
+          font-size: 28rpx;
           font-weight: bold;
           color: #333;
-          margin-right: 16rpx;
+          margin-right: 12rpx;
         }
         
         .status-badge {
-          padding: 8rpx 16rpx;
-          border-radius: 20rpx;
-          font-size: 22rpx;
+          padding: 4rpx 12rpx;
+          border-radius: 12rpx;
+          font-size: 20rpx;
           font-weight: bold;
           
           &.status-enabled {
@@ -1184,54 +1203,72 @@ export default {
       }
       
       .config-type {
-        font-size: 24rpx;
+        font-size: 20rpx;
         color: #666;
         background: #f5f5f5;
-        padding: 8rpx 12rpx;
-        border-radius: 8rpx;
+        padding: 6rpx 10rpx;
+        border-radius: 6rpx;
       }
     }
     
     .config-details {
-      margin-bottom: 20rpx;
-      min-height: 420rpx;
+      margin-bottom: 12rpx;
+      padding: 12rpx;
+      background: #f8f9fa;
+      border-radius: 12rpx;
+      border: 1rpx solid #e9ecef;
+      
+      // 使用网格布局让数据更紧凑
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6rpx 12rpx;
+      
+      // 确保内容完整显示，不被截断
+      height: auto;
       overflow: visible;
       
       .detail-row {
         display: flex;
         align-items: center;
-        margin-bottom: 12rpx;
+        min-height: 24rpx;
+        padding: 2rpx 0;
         
-        &:last-child {
-          margin-bottom: 0;
+        // 让某些行占据整行宽度（如游戏、网址等长文本）
+        &.full-width {
+          grid-column: 1 / -1;
         }
         
         .label {
-          font-size: 26rpx;
+          font-size: 20rpx;
           color: #666;
-          width: 160rpx;
+          width: 100rpx;
           flex-shrink: 0;
+          font-weight: 500;
         }
         
         .value {
-          font-size: 26rpx;
+          font-size: 20rpx;
           color: #333;
           flex: 1;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
           
           &.account-info {
             font-weight: bold;
           }
           
           &.game-names, &.url-names {
-            font-size: 24rpx;
+            font-size: 20rpx;
             line-height: 1.4;
+            word-break: break-all;
+            white-space: normal;
           }
         }
         
         .online-status {
-          padding: 4rpx 12rpx;
-          border-radius: 12rpx;
-          font-size: 22rpx;
+          padding: 2rpx 8rpx;
+          border-radius: 8rpx;
+          font-size: 20rpx;
           font-weight: bold;
           
           &.online {
@@ -1247,10 +1284,12 @@ export default {
         
         .profit-positive {
           color: #4CAF50;
+          font-weight: bold;
         }
         
         .profit-negative {
           color: #f44336;
+          font-weight: bold;
         }
         
         .profit-zero {
@@ -1261,8 +1300,20 @@ export default {
     
     .config-actions {
       display: flex;
-      gap: 16rpx;
-      flex-wrap: wrap;
+      gap: 8rpx;
+      flex-wrap: nowrap; // 不换行，4个按钮在一行显示
+      padding: 0;
+      margin-top: 8rpx;
+      
+      // 让按钮更紧凑，4个按钮平均分布在一行
+      ::v-deep .u-button {
+        flex: 1;
+        min-width: 0 !important;
+        height: 54rpx !important;
+        font-size: 22rpx !important;
+        padding: 0 6rpx !important;
+        border-radius: 6rpx !important;
+      }
     }
   }
 }
