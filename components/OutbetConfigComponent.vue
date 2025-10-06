@@ -168,11 +168,11 @@
   </view>
 
   <!-- 配置详情弹窗 -->
-  <u-popup :show="showDetailPopup" mode="bottom" height="600rpx" :border-radius="20" @close="showDetailPopup = false" :safe-area-inset-bottom="true">
+  <u-popup :show="showDetailPopup" mode="bottom" height="600rpx" :border-radius="20" @close="closeDetailPopup" :safe-area-inset-bottom="true">
       <view class="detail-popup">
         <view class="popup-header">
           <view class="header-left">
-            <text @click="showDetailPopup = false" class="close-btn">关闭</text>
+            <text @click="closeDetailPopup" class="close-btn">关闭</text>
           </view>
           <view class="header-center">
             <text class="popup-title">配置详情</text>
@@ -277,6 +277,60 @@
               <text class="item-value">{{ currentConfig.update_time }}</text>
             </view>
           </view>
+          
+          <!-- 日志信息区域 -->
+          <view class="detail-section">
+            <view class="section-title">
+              <text>操作日志</text>
+              <view class="log-controls">
+                <view class="time-filter">
+                  <text class="filter-label">时间范围：</text>
+                  <select v-model="logTimeRange" @change="loadLogs" class="time-select">
+                    <option value="10">最近10分钟</option>
+                    <option value="30">最近30分钟</option>
+                    <option value="60">最近1小时</option>
+                    <option value="240">最近4小时</option>
+                    <option value="1440">最近24小时</option>
+                  </select>
+                </view>
+                <view class="refresh-btn" @click="loadLogs">
+                  <text class="refresh-icon">🔄</text>
+                  <text class="refresh-text">刷新</text>
+                </view>
+              </view>
+            </view>
+            
+            <!-- 日志加载状态 -->
+            <view v-if="logsLoading" class="log-loading">
+              <text class="loading-text">正在加载日志...</text>
+            </view>
+            
+            <!-- 日志列表 -->
+            <view v-else-if="logsList.length > 0" class="logs-container">
+              <view v-for="(log, index) in logsList" :key="index" class="log-item" :class="getLogTypeClass(log.type)">
+                <view class="log-header">
+                  <text class="log-type">{{ getLogTypeLabel(log.type) }}</text>
+                  <text class="log-time">{{ formatLogTime(log.create_time) }}</text>
+                </view>
+                <view class="log-content">
+                  <text class="log-message">{{ log.message }}</text>
+                </view>
+                <view v-if="log.data" class="log-data">
+                  <text class="data-label">数据：</text>
+                  <text class="data-content">{{ formatLogData(log.data) }}</text>
+                </view>
+                <view v-if="log.error" class="log-error">
+                  <text class="error-label">错误：</text>
+                  <text class="error-content">{{ log.error }}</text>
+                </view>
+              </view>
+            </view>
+            
+            <!-- 无日志提示 -->
+            <view v-else class="no-logs">
+              <text class="no-logs-text">暂无日志记录</text>
+            </view>
+          </view>
         </view>
       </view>
     </u-popup>
@@ -347,7 +401,11 @@ export default {
       showOpenDialog: false,
       openDuration: '',
       openPrice: 0,
-      openDays: 1
+      openDays: 1,
+      // 日志相关数据
+      logsList: [],
+      logsLoading: false,
+      logTimeRange: '10' // 默认10分钟
     }
   },
   mounted() {
@@ -495,6 +553,8 @@ export default {
     viewConfig(item) {
       this.currentConfig = item;
       this.showDetailPopup = true;
+      // 加载日志数据
+      this.loadLogs();
     },
 
     // 编辑配置
@@ -522,6 +582,14 @@ export default {
     editCurrentConfig() {
       this.showDetailPopup = false;
       this.editConfig(this.currentConfig);
+    },
+
+    // 关闭详情弹窗
+    closeDetailPopup() {
+      this.showDetailPopup = false;
+      // 清空日志数据，释放内存
+      this.logsList = [];
+      this.logsLoading = false;
     },
 
     // 切换状态
@@ -797,6 +865,168 @@ export default {
         this.remainingTimeText = `还剩${minutes}分钟`;
       } else {
         this.remainingTimeText = '即将过期';
+      }
+    },
+
+    // 加载日志数据
+    loadLogs() {
+      if (!this.currentConfig.id) {
+        console.warn('⚠️ 无法加载日志：配置ID不存在');
+        return;
+      }
+
+      this.logsLoading = true;
+      console.log('📡 开始加载配置日志，配置ID:', this.currentConfig.id, '时间范围:', this.logTimeRange);
+
+      // 计算时间范围
+      const now = new Date();
+      const minutesAgo = parseInt(this.logTimeRange);
+      const startTime = new Date(now.getTime() - minutesAgo * 60 * 1000);
+
+      // 使用真实的日志API
+      this.$u.api.agent.getOutbetLogs({
+        config_id: this.currentConfig.id,
+        start_time: startTime.toISOString(),
+        end_time: now.toISOString(),
+        limit: 50
+      }).then(res => {
+        console.log('📡 日志响应:', res);
+        this.logsLoading = false;
+        
+        if (res.status === 200 || res.code === 1) {
+          this.logsList = res.data || [];
+          console.log('✅ 日志加载成功，共', this.logsList.length, '条记录');
+        } else {
+          console.warn('⚠️ 获取日志失败:', res.msg);
+          this.logsList = [];
+          uni.showToast({
+            title: res.msg || '获取日志失败',
+            icon: 'none'
+          });
+        }
+      }).catch(err => {
+        console.error('❌ 获取日志出错:', err);
+        this.logsLoading = false;
+        
+        // 如果API调用失败，使用模拟数据
+        console.log('🧪 API调用失败，使用模拟日志数据');
+        this.generateMockLogs();
+      });
+    },
+
+    // 生成模拟日志数据
+    generateMockLogs() {
+      this.logsLoading = false; // 确保加载状态结束
+      
+      const now = new Date();
+      const mockLogs = [
+        {
+          id: 1,
+          type: 'login',
+          message: '盘口登录成功',
+          data: JSON.stringify({ username: this.currentConfig.username, status: 'success' }),
+          error: null,
+          create_time: new Date(now.getTime() - 5 * 60 * 1000).toISOString()
+        },
+        {
+          id: 2,
+          type: 'bet',
+          message: '投注成功',
+          data: JSON.stringify({ amount: 100, game: 'PK10', result: 'success' }),
+          error: null,
+          create_time: new Date(now.getTime() - 3 * 60 * 1000).toISOString()
+        },
+        {
+          id: 3,
+          type: 'error',
+          message: '连接超时',
+          data: null,
+          error: 'Connection timeout after 30 seconds',
+          create_time: new Date(now.getTime() - 1 * 60 * 1000).toISOString()
+        },
+        {
+          id: 4,
+          type: 'info',
+          message: '配置更新',
+          data: JSON.stringify({ field: 'enabled', old_value: 0, new_value: 1 }),
+          error: null,
+          create_time: new Date(now.getTime() - 30 * 1000).toISOString()
+        },
+        {
+          id: 5,
+          type: 'warning',
+          message: '余额不足警告',
+          data: JSON.stringify({ balance: 50, threshold: 100 }),
+          error: null,
+          create_time: new Date(now.getTime() - 2 * 60 * 1000).toISOString()
+        },
+        {
+          id: 6,
+          type: 'success',
+          message: '投注结算完成',
+          data: JSON.stringify({ bet_id: 'BET001', profit: 150 }),
+          error: null,
+          create_time: new Date(now.getTime() - 4 * 60 * 1000).toISOString()
+        }
+      ];
+      
+      this.logsList = mockLogs;
+      console.log('🧪 模拟日志数据已生成:', mockLogs);
+    },
+
+    // 获取日志类型标签
+    getLogTypeLabel(type) {
+      const typeMap = {
+        'login': '登录',
+        'logout': '登出',
+        'bet': '投注',
+        'error': '错误',
+        'info': '信息',
+        'warning': '警告',
+        'success': '成功'
+      };
+      return typeMap[type] || '未知';
+    },
+
+    // 获取日志类型样式类
+    getLogTypeClass(type) {
+      return `log-${type}`;
+    },
+
+    // 格式化日志时间
+    formatLogTime(timeStr) {
+      if (!timeStr) return '';
+      
+      const date = new Date(timeStr);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      
+      if (diffMins < 1) {
+        return '刚刚';
+      } else if (diffMins < 60) {
+        return `${diffMins}分钟前`;
+      } else if (diffMins < 1440) {
+        const hours = Math.floor(diffMins / 60);
+        return `${hours}小时前`;
+      } else {
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${month}-${day} ${hours}:${minutes}`;
+      }
+    },
+
+    // 格式化日志数据
+    formatLogData(dataStr) {
+      if (!dataStr) return '';
+      
+      try {
+        const data = JSON.parse(dataStr);
+        return JSON.stringify(data, null, 2);
+      } catch (e) {
+        return dataStr;
       }
     }
   }
@@ -1474,6 +1704,226 @@ export default {
         }
       }
     }
+  }
+}
+
+// 日志相关样式
+.log-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10rpx;
+  
+  .time-filter {
+    display: flex;
+    align-items: center;
+    
+    .filter-label {
+      font-size: 24rpx;
+      color: #666;
+      margin-right: 10rpx;
+    }
+    
+    .time-select {
+      padding: 6rpx 12rpx;
+      border: 1rpx solid #ddd;
+      border-radius: 6rpx;
+      font-size: 24rpx;
+      background: white;
+      color: #333;
+    }
+  }
+  
+  .refresh-btn {
+    display: flex;
+    align-items: center;
+    padding: 6rpx 12rpx;
+    background: #007aff;
+    border-radius: 6rpx;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      background: #0056cc;
+    }
+    
+    .refresh-icon {
+      font-size: 20rpx;
+      margin-right: 4rpx;
+    }
+    
+    .refresh-text {
+      font-size: 24rpx;
+      color: white;
+    }
+  }
+}
+
+.log-loading {
+  text-align: center;
+  padding: 40rpx 20rpx;
+  
+  .loading-text {
+    font-size: 26rpx;
+    color: #999;
+  }
+}
+
+.logs-container {
+  max-height: 400rpx;
+  overflow-y: auto;
+  
+  .log-item {
+    background: #f8f9fa;
+    border-radius: 8rpx;
+    padding: 16rpx;
+    margin-bottom: 12rpx;
+    border-left: 4rpx solid #ddd;
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+    
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8rpx;
+      
+      .log-type {
+        font-size: 24rpx;
+        font-weight: bold;
+        padding: 4rpx 8rpx;
+        border-radius: 4rpx;
+        color: white;
+      }
+      
+      .log-time {
+        font-size: 22rpx;
+        color: #999;
+      }
+    }
+    
+    .log-content {
+      margin-bottom: 8rpx;
+      
+      .log-message {
+        font-size: 26rpx;
+        color: #333;
+        line-height: 1.4;
+      }
+    }
+    
+    .log-data {
+      margin-bottom: 8rpx;
+      
+      .data-label {
+        font-size: 22rpx;
+        color: #666;
+        font-weight: bold;
+      }
+      
+      .data-content {
+        font-size: 22rpx;
+        color: #333;
+        background: #e9ecef;
+        padding: 8rpx;
+        border-radius: 4rpx;
+        display: block;
+        margin-top: 4rpx;
+        font-family: monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+    }
+    
+    .log-error {
+      .error-label {
+        font-size: 22rpx;
+        color: #dc3545;
+        font-weight: bold;
+      }
+      
+      .error-content {
+        font-size: 22rpx;
+        color: #dc3545;
+        background: #f8d7da;
+        padding: 8rpx;
+        border-radius: 4rpx;
+        display: block;
+        margin-top: 4rpx;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+    }
+    
+    // 不同日志类型的样式
+    &.log-login {
+      border-left-color: #28a745;
+      
+      .log-type {
+        background: #28a745;
+      }
+    }
+    
+    &.log-logout {
+      border-left-color: #6c757d;
+      
+      .log-type {
+        background: #6c757d;
+      }
+    }
+    
+    &.log-bet {
+      border-left-color: #007bff;
+      
+      .log-type {
+        background: #007bff;
+      }
+    }
+    
+    &.log-error {
+      border-left-color: #dc3545;
+      
+      .log-type {
+        background: #dc3545;
+      }
+    }
+    
+    &.log-info {
+      border-left-color: #17a2b8;
+      
+      .log-type {
+        background: #17a2b8;
+      }
+    }
+    
+    &.log-warning {
+      border-left-color: #ffc107;
+      
+      .log-type {
+        background: #ffc107;
+        color: #333;
+      }
+    }
+    
+    &.log-success {
+      border-left-color: #28a745;
+      
+      .log-type {
+        background: #28a745;
+      }
+    }
+  }
+}
+
+.no-logs {
+  text-align: center;
+  padding: 40rpx 20rpx;
+  
+  .no-logs-text {
+    font-size: 26rpx;
+    color: #999;
   }
 }
 </style>

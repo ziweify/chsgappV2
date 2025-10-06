@@ -136,6 +136,7 @@ const install = (Vue, vm) => {
 		updateOutbetSwitch: (params) => http.post("/agent/outbet/updateOutbetSwitch",params),//更新打单总开关
 		applyOutbet: (params) => http.post("/agent/outbet/applyOutbet",params),//申请打单
 		getOutbetTypeList: (params) => http.get("/agent/outbet/getOutbetTypeList",{params:params}),//获取打单类型列表
+		getOutbetLogs: (params) => http.get("/agent/outbet/getOutbetLogs",{params:params}),//获取打单配置日志
 	}
 
 	uni.$u.api = {
