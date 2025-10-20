@@ -168,7 +168,7 @@
   </view>
 
   <!-- 配置详情弹窗 -->
-  <u-popup :show="showDetailPopup" mode="bottom" height="600rpx" :border-radius="20" @close="closeDetailPopup" :safe-area-inset-bottom="true">
+  <u-popup :show="showDetailPopup" mode="center" :closeOnClickOverlay="true" @close="closeDetailPopup" :safeAreaInsetTop="true" :customStyle="{'width':'100%','height':'100%','max-width':'100vw','border-radius':'0','overflow':'visible'}">
       <view class="detail-popup">
         <view class="popup-header">
           <view class="header-left">
@@ -184,98 +184,10 @@
         </view>
         
         <view class="detail-content">
-          <view class="detail-section">
-            <view class="section-title">基本信息</view>
-            <view class="detail-item">
-              <text class="item-label">配置名称</text>
-              <text class="item-value">{{ currentConfig.name }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="item-label">盘口类型</text>
-              <text class="item-value">{{ getTypeLabel(currentConfig.type) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="item-label">盘口账号</text>
-              <text class="item-value">{{ currentConfig.username }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="item-label">在线状态</text>
-              <view class="online-status" :class="currentConfig.online == 1 ? 'online' : 'offline'">
-                {{ currentConfig.online == 1 ? '在线' : '离线' }}
-              </view>
-            </view>
-            <view class="detail-item">
-              <text class="item-label">启用状态</text>
-              <view class="status-badge" :class="currentConfig.enabled == 1 ? 'status-enabled' : 'status-disabled'">
-                {{ currentConfig.enabled == 1 ? '启用' : '禁用' }}
-              </view>
-            </view>
-          </view>
-          
-          <view class="detail-section">
-            <view class="section-title">账户信息</view>
-            <view class="detail-item">
-              <text class="item-label">余额/未结/盈亏</text>
-              <text class="item-value account-info">
-                {{ currentConfig.balance || '0' }}/{{ currentConfig.unsettle || '0' }}/<text :class="getProfitClass(currentConfig.sy)">{{ currentConfig.sy || '0' }}</text>
-              </text>
-            </view>
-          </view>
-          
-          <view class="detail-section">
-            <view class="section-title">投注设置</view>
-            <view class="detail-item">
-              <text class="item-label">投注模式</text>
-              <text class="item-value">{{ getBetModeLabel(currentConfig.bet_mode) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="item-label">合并去重</text>
-              <text class="item-value">{{ currentConfig.is_hebing == 1 ? '是' : '否' }}</text>
-            </view>
-            <view class="detail-item" v-if="currentConfig.start_money > 0">
-              <text class="item-label">起飞金额</text>
-              <text class="item-value">{{ currentConfig.start_money }}元</text>
-            </view>
-            <view class="detail-item" v-if="currentConfig.chai_money > 0">
-              <text class="item-label">大额分投</text>
-              <text class="item-value">{{ currentConfig.chai_money }}元</text>
-            </view>
-          </view>
-          
-          <view class="detail-section" v-if="currentConfig.gidsname">
-            <view class="section-title">游戏设置</view>
-            <view class="detail-item">
-              <text class="item-label">打单游戏</text>
-              <text class="item-value">{{ currentConfig.gidsname }}</text>
-            </view>
-          </view>
-          
-          <view class="detail-section" v-if="currentConfig.zhidingusernames">
-            <view class="section-title">会员设置</view>
-            <view class="detail-item">
-              <text class="item-label">指定会员</text>
-              <text class="item-value">{{ currentConfig.zhidingusernames }}</text>
-            </view>
-          </view>
-          
-          <view class="detail-section" v-if="currentConfig.urls">
-            <view class="section-title">网址配置</view>
-            <view class="detail-item">
-              <text class="item-label">相关网址</text>
-              <text class="item-value url-text">{{ currentConfig.urls }}</text>
-            </view>
-          </view>
-          
-          <view class="detail-section">
-            <view class="section-title">时间信息</view>
-            <view class="detail-item" v-if="currentConfig.create_time">
-              <text class="item-label">创建时间</text>
-              <text class="item-value">{{ currentConfig.create_time }}</text>
-            </view>
-            <view class="detail-item" v-if="currentConfig.update_time">
-              <text class="item-label">更新时间</text>
-              <text class="item-value">{{ currentConfig.update_time }}</text>
-            </view>
+          <!-- 简化的配置信息 -->
+          <view class="config-summary">
+            <text class="config-name">{{ currentConfig.name }} {{ randomNumber }}</text>
+            <text class="config-details">盘口账号: {{ currentConfig.username }} | 盘口类型: {{ getTypeLabel(currentConfig.type) }}</text>
           </view>
           
           <!-- 日志信息区域 -->
@@ -291,12 +203,41 @@
                     <option value="60">最近1小时</option>
                     <option value="240">最近4小时</option>
                     <option value="1440">最近24小时</option>
+                    <option value="10080">最近7天</option>
+                    <option value="0">全部</option>
                   </select>
                 </view>
                 <view class="refresh-btn" @click="loadLogs">
                   <text class="refresh-icon">🔄</text>
                   <text class="refresh-text">刷新</text>
                 </view>
+              </view>
+            </view>
+            
+            <!-- 日志类型筛选 -->
+            <view class="log-type-filter">
+              <text class="filter-title">日志类型：</text>
+              <view class="checkbox-group">
+                <label class="checkbox-item">
+                  <checkbox :checked="logTypeFilters.config" @change="onLogTypeChange('config', $event)" />
+                  <text class="checkbox-label">配置管理</text>
+                </label>
+                <label class="checkbox-item">
+                  <checkbox :checked="logTypeFilters.login" @change="onLogTypeChange('login', $event)" />
+                  <text class="checkbox-label">登录操作</text>
+                </label>
+                <label class="checkbox-item">
+                  <checkbox :checked="logTypeFilters.balance" @change="onLogTypeChange('balance', $event)" />
+                  <text class="checkbox-label">余额查询</text>
+                </label>
+                <label class="checkbox-item">
+                  <checkbox :checked="logTypeFilters.bet" @change="onLogTypeChange('bet', $event)" />
+                  <text class="checkbox-label">投注操作</text>
+                </label>
+                <label class="checkbox-item">
+                  <checkbox :checked="logTypeFilters.error" @change="onLogTypeChange('error', $event)" />
+                  <text class="checkbox-label">错误日志</text>
+                </label>
               </view>
             </view>
             
@@ -394,6 +335,7 @@ export default {
       remainingTimeText: '',
       showDetailPopup: false,
       currentConfig: {},
+      randomNumber: '',
       showDeleteDialog: false,
       toDeleteConfig: {},
       isProcessing: false,
@@ -405,7 +347,14 @@ export default {
       // 日志相关数据
       logsList: [],
       logsLoading: false,
-      logTimeRange: '10' // 默认10分钟
+      logTimeRange: '0', // 默认全部
+      logTypeFilters: {
+        config: true,    // 配置管理
+        login: true,     // 登录操作
+        balance: true,   // 余额查询
+        bet: true,       // 投注操作
+        error: true      // 错误日志
+      }
     }
   },
   mounted() {
@@ -483,6 +432,10 @@ export default {
             listData = res.data;
           }
           console.log('✅ 配置列表数据:', listData);
+          console.log('📋 配置列表详细信息:');
+          listData.forEach((config, index) => {
+            console.log(`  配置${index + 1}: ID=${config.id}, 名称=${config.name}, 用户名=${config.username}`);
+          });
           this.list = listData;
         } else {
           console.warn('⚠️ 获取配置列表失败:', res.msg);
@@ -552,6 +505,13 @@ export default {
     // 查看配置
     viewConfig(item) {
       this.currentConfig = item;
+      // 生成3位随机数字
+      this.randomNumber = Math.floor(Math.random() * 900) + 100;
+      console.log('🔍 查看配置详情:', {
+        configId: item.id,
+        configName: item.name,
+        currentConfig: this.currentConfig
+      });
       this.showDetailPopup = true;
       // 加载日志数据
       this.loadLogs();
@@ -872,30 +832,70 @@ export default {
     loadLogs() {
       if (!this.currentConfig.id) {
         console.warn('⚠️ 无法加载日志：配置ID不存在');
+        this.logsLoading = false;
+        this.logsList = [];
         return;
       }
 
       this.logsLoading = true;
       console.log('📡 开始加载配置日志，配置ID:', this.currentConfig.id, '时间范围:', this.logTimeRange);
+      console.log('📋 当前配置完整信息:', this.currentConfig);
 
       // 计算时间范围
       const now = new Date();
       const minutesAgo = parseInt(this.logTimeRange);
-      const startTime = new Date(now.getTime() - minutesAgo * 60 * 1000);
-
-      // 使用真实的日志API
-      this.$u.api.agent.getOutbetLogs({
+      
+      let apiParams = {
         config_id: this.currentConfig.id,
-        start_time: startTime.toISOString(),
-        end_time: now.toISOString(),
-        limit: 50
-      }).then(res => {
+        limit: 500  // 增加到500条，确保能显示更多历史日志
+      };
+      
+      // 如果不是"全部"选项，则添加时间范围
+      if (minutesAgo > 0) {
+        const startTime = new Date(now.getTime() - minutesAgo * 60 * 1000);
+        apiParams.start_time = startTime.toISOString();
+        apiParams.end_time = now.toISOString();
+      }
+      
+      // 添加日志类型筛选
+      const selectedTypes = [];
+      Object.keys(this.logTypeFilters).forEach(type => {
+        if (this.logTypeFilters[type]) {
+          selectedTypes.push(type);
+        }
+      });
+      // 只有在不是全选的情况下才添加筛选参数
+      if (selectedTypes.length > 0 && selectedTypes.length < Object.keys(this.logTypeFilters).length) {
+        apiParams.log_types = selectedTypes;
+      }
+      // 如果全选或没选择，不传递log_types参数，让后端返回所有日志
+
+      // 调用真实的日志API
+      console.log('📤 发送API请求参数:', apiParams);
+      console.log('🔐 当前用户认证信息:', {
+        token: uni.getStorageSync('token'),
+        user: uni.getStorageSync('user')
+      });
+      this.$u.api.agent.getOutbetLogs(apiParams).then(res => {
         console.log('📡 日志响应:', res);
+        console.log('🔍 响应详细分析:', {
+          status: res.status,
+          dataLength: res.data ? res.data.length : 0,
+          dataType: typeof res.data,
+          firstItem: res.data && res.data.length > 0 ? res.data[0] : null
+        });
         this.logsLoading = false;
         
         if (res.status === 200 || res.code === 1) {
           this.logsList = res.data || [];
           console.log('✅ 日志加载成功，共', this.logsList.length, '条记录');
+          console.log('📋 前5条日志详情:');
+          this.logsList.slice(0, 5).forEach((log, index) => {
+            console.log(`  ${index + 1}. ID:${log.id} [${log.module || 'N/A'}] ${log.type}: ${log.message} (${log.create_time})`);
+          });
+          if (this.logsList.length > 5) {
+            console.log(`  ... 还有 ${this.logsList.length - 5} 条日志`);
+          }
         } else {
           console.warn('⚠️ 获取日志失败:', res.msg);
           this.logsList = [];
@@ -907,71 +907,20 @@ export default {
       }).catch(err => {
         console.error('❌ 获取日志出错:', err);
         this.logsLoading = false;
-        
-        // 如果API调用失败，使用模拟数据
-        console.log('🧪 API调用失败，使用模拟日志数据');
-        this.generateMockLogs();
+        this.logsList = [];
+        uni.showToast({
+          title: '获取日志失败',
+          icon: 'none'
+        });
       });
     },
 
-    // 生成模拟日志数据
-    generateMockLogs() {
-      this.logsLoading = false; // 确保加载状态结束
-      
-      const now = new Date();
-      const mockLogs = [
-        {
-          id: 1,
-          type: 'login',
-          message: '盘口登录成功',
-          data: JSON.stringify({ username: this.currentConfig.username, status: 'success' }),
-          error: null,
-          create_time: new Date(now.getTime() - 5 * 60 * 1000).toISOString()
-        },
-        {
-          id: 2,
-          type: 'bet',
-          message: '投注成功',
-          data: JSON.stringify({ amount: 100, game: 'PK10', result: 'success' }),
-          error: null,
-          create_time: new Date(now.getTime() - 3 * 60 * 1000).toISOString()
-        },
-        {
-          id: 3,
-          type: 'error',
-          message: '连接超时',
-          data: null,
-          error: 'Connection timeout after 30 seconds',
-          create_time: new Date(now.getTime() - 1 * 60 * 1000).toISOString()
-        },
-        {
-          id: 4,
-          type: 'info',
-          message: '配置更新',
-          data: JSON.stringify({ field: 'enabled', old_value: 0, new_value: 1 }),
-          error: null,
-          create_time: new Date(now.getTime() - 30 * 1000).toISOString()
-        },
-        {
-          id: 5,
-          type: 'warning',
-          message: '余额不足警告',
-          data: JSON.stringify({ balance: 50, threshold: 100 }),
-          error: null,
-          create_time: new Date(now.getTime() - 2 * 60 * 1000).toISOString()
-        },
-        {
-          id: 6,
-          type: 'success',
-          message: '投注结算完成',
-          data: JSON.stringify({ bet_id: 'BET001', profit: 150 }),
-          error: null,
-          create_time: new Date(now.getTime() - 4 * 60 * 1000).toISOString()
-        }
-      ];
-      
-      this.logsList = mockLogs;
-      console.log('🧪 模拟日志数据已生成:', mockLogs);
+    // 处理日志类型筛选变化
+    onLogTypeChange(type, event) {
+      this.logTypeFilters[type] = event.detail.value.length > 0;
+      console.log('📋 日志类型筛选变化:', type, this.logTypeFilters[type]);
+      // 自动重新加载日志
+      this.loadLogs();
     },
 
     // 获取日志类型标签
@@ -1560,17 +1509,20 @@ export default {
 
 // 详情弹窗样式
 .detail-popup {
-  height: 100%;
+  height: 100vh;
+  width: 100vw;
   display: flex;
   flex-direction: column;
+  background: #f5f5f5;
   
   .popup-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 30rpx;
-    background: #f8f9fa;
+    padding: 40rpx 30rpx;
+    background: #fff;
     border-bottom: 1rpx solid #e9ecef;
+    box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.1);
     
     .header-left, .header-right {
       width: 120rpx;
@@ -1606,6 +1558,28 @@ export default {
     flex: 1;
     overflow-y: auto;
     padding: 20rpx;
+    
+    .config-summary {
+      background: white;
+      border-radius: 12rpx;
+      padding: 20rpx;
+      margin-bottom: 20rpx;
+      text-align: center;
+      
+      .config-name {
+        font-size: 32rpx;
+        font-weight: bold;
+        color: #333;
+        display: block;
+        margin-bottom: 8rpx;
+      }
+      
+      .config-details {
+        font-size: 24rpx;
+        color: #666;
+        display: block;
+      }
+    }
     
     .detail-section {
       background: white;
@@ -1769,8 +1743,56 @@ export default {
   }
 }
 
+// 日志类型筛选样式
+.log-type-filter {
+  margin: 16rpx 0;
+  padding: 16rpx;
+  background: #f8f9fa;
+  border-radius: 8rpx;
+  
+  .filter-title {
+    font-size: 24rpx;
+    color: #666;
+    margin-bottom: 12rpx;
+    display: block;
+  }
+  
+  .checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx;
+    
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      padding: 6rpx 12rpx;
+      background: white;
+      border-radius: 16rpx;
+      border: 1rpx solid #e0e0e0;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      
+      &:hover {
+        border-color: #007aff;
+        background: #f0f8ff;
+      }
+      
+      checkbox {
+        margin-right: 6rpx;
+        transform: scale(0.8);
+      }
+      
+      .checkbox-label {
+        font-size: 22rpx;
+        color: #333;
+        white-space: nowrap;
+      }
+    }
+  }
+}
+
 .logs-container {
-  max-height: 400rpx;
+  max-height: 60vh;
   overflow-y: auto;
   
   .log-item {
