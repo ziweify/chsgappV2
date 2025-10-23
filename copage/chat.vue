@@ -1722,6 +1722,10 @@ export default {
         } else if (this.tmpToButomFlag) {
           // 用户刚发送消息，强制显示
           shouldShowImmediately = true;
+        } else if (msg.sender != this.uid) {
+          // 🔧 新增：系统回复消息（非自己发送的）总是立即显示
+          shouldShowImmediately = true;
+          console.log('✅ 系统回复消息，强制立即显示:', msg.content);
         }
         
         if(Array.isArray(msg)){
@@ -1871,8 +1875,21 @@ export default {
               content: msg.content
             });
             
-            if (shouldShowImmediately) {
-              console.log('✅ 立即显示消息:', msg.content);
+            // 🔧 特殊处理：投注相关消息总是立即显示
+            const isBettingMessage = msg.content && (
+              msg.content.includes('下单成功') ||
+              msg.content.includes('解析失败') ||
+              msg.content.includes('余额不足') ||
+              msg.content.includes('撤单') ||
+              msg.content.includes('流水记录') ||
+              msg.content.includes('已收到') ||
+              msg.content.includes('申请') ||
+              msg.content.includes('投注') ||
+              msg.content.includes('下注')
+            );
+            
+            if (shouldShowImmediately || isBettingMessage) {
+              console.log('✅ 立即显示消息:', msg.content, isBettingMessage ? '(投注相关消息)' : '');
               this.$nextTick(() => {
                 this.chatList.push(msg);
                 this.tmpToButomFlag = false;
@@ -1887,9 +1904,16 @@ export default {
           }
         }
         
-        // 只有在应该立即显示且用户确实在底部时才自动滚动到底部
-        if(shouldShowImmediately && this.isAtBottom && this.swiperCurrent == 0 && !this.isLoadingMore && !this.tmpToButomFlag){
+        // 🔧 修复：只有用户在底部或刚发送消息时才自动滚动
+        // 关键：用户翻看历史记录时不打断
+        if(this.isAtBottom && this.swiperCurrent == 0 && !this.isLoadingMore && !this.tmpToButomFlag){
           this.toBottom(150, true, false); // 不加载待显示消息，只滚动
+        } else if(this.tmpToButomFlag && this.swiperCurrent == 0 && !this.isLoadingMore){
+          // 用户刚发送消息，自动滚动到底部
+          this.toBottom(150, true, false);
+        } else {
+          // 用户不在底部，消息已加载但不自动滚动
+          console.log('📌 消息已加载，但用户不在底部，保持当前位置');
         }
         
         if(data.other.openResult && data.other.openResult == 1){
@@ -2465,7 +2489,9 @@ export default {
         this.lastScrollTime = Date.now();
         
         const previousIsAtBottom = this.isAtBottom;
-        this.isAtBottom =  s.scrollHeight - s.offsetHeight - s.scrollTop - s.offsetTop < 50;
+        // 🔧 增加容错范围：150px约等于2-3条消息的高度
+        // 这样用户在接近底部时也能自动滚动，而不是必须在绝对底部
+        this.isAtBottom =  s.scrollHeight - s.offsetHeight - s.scrollTop - s.offsetTop < 150;
         
         // 严格的用户交互检测，避免DOM更新引起的误判
         const now = Date.now();

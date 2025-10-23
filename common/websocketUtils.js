@@ -39,6 +39,17 @@ class websocketUtils {
         this.connectingPromise = null; // 当前连接Promise，避免重复连接
         this.shouldCloseAfterConnect = false; // 连接建立后是否应该立即关闭
         
+        // 🔧 浏览器检测 - 针对Firefox优化
+        this.isFirefox = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+        this.isChrome = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().indexOf('chrome') > -1;
+        
+        // Firefox特殊配置
+        if (this.isFirefox) {
+            console.log('🦊 检测到Firefox浏览器，使用优化的重连策略');
+            this.heartbeatTimeoutDuration = 20000; // 增加心跳超时到20秒
+            this.reconnectInterval = 3000; // 增加重连间隔到3秒
+        }
+        
         // 性能监控 - 已禁用
         // if (uni.$performanceMonitor) {
         //     this.performanceMonitor = uni.$performanceMonitor;
@@ -353,9 +364,12 @@ class websocketUtils {
             let isResolved = false;
 
             // 连接超时处理 - 改进版
+            // 🔧 Firefox使用更长的超时时间
+            const timeoutDuration = this.isFirefox ? 15000 : 10000; // Firefox: 15秒，Chrome: 10秒
+            
             openTimer = setTimeout(() => {
                 if (!isResolved) {
-                    // console.error('WebSocket连接超时');
+                    console.error(`WebSocket连接超时 (${timeoutDuration/1000}秒)`);
                     isResolved = true;
                     
                     // 主动关闭超时的socket连接
@@ -380,7 +394,7 @@ class websocketUtils {
                     _this.handleConnectionFailure('connect_timeout');
                     reject(new Error('连接超时'));
                 }
-            }, 10000); // 10秒超时
+            }, timeoutDuration);
 
             this.socketTask.onOpen((res) => {
                 if (!isResolved) {
@@ -463,6 +477,24 @@ class websocketUtils {
         this.isConnecting = false;
         this.connectingPromise = null;
         this.shouldCloseAfterConnect = false;
+        
+        // 🔧 Firefox: 强制清理WebSocket对象
+        if (this.isFirefox && this.socketTask) {
+            try {
+                // 确保连接被完全关闭
+                if (this.socketTask.readyState !== undefined && this.socketTask.readyState !== 3) { // 3 = CLOSED
+                    console.log('🦊 Firefox: 强制关闭残留的WebSocket连接');
+                    this.socketTask.close({
+                        code: 1000,
+                        reason: 'force_cleanup'
+                    });
+                }
+                this.socketTask = null;
+            } catch (e) {
+                console.warn('🦊 Firefox: 强制清理连接失败', e);
+                this.socketTask = null; // 无论如何都要清空
+            }
+        }
     }
 
     // 处理消息
@@ -934,12 +966,28 @@ class websocketUtils {
             
             // 重连失败，使用指数退避算法计算延迟时间
             if (!this.isUserClose && this.shouldAutoReconnect && !this.isUserExitApp && !this.disableAutoReconnect) {
-                // 指数退避：基础间隔 * 2^(重连次数/10)，最大30秒
+                // 🔧 改进的指数退避算法
                 const baseInterval = this.reconnectInterval;
-                const backoffMultiplier = Math.min(Math.pow(2, Math.floor(this.reconnectAttempts / 10)), 15);
-                const delayTime = Math.min(baseInterval * backoffMultiplier, 30000);
                 
-                console.log(`🔄 ${delayTime / 1000}秒后继续重连 (指数退避: ${backoffMultiplier}x)`);
+                // 计算退避倍数：前3次快速重试，之后指数退避
+                let backoffMultiplier = 1;
+                if (this.reconnectAttempts <= 3) {
+                    // 前3次：2秒、3秒、4秒
+                    backoffMultiplier = this.reconnectAttempts * 0.5;
+                } else {
+                    // 第4次及以后：指数退避
+                    backoffMultiplier = Math.pow(2, Math.floor((this.reconnectAttempts - 3) / 3));
+                }
+                
+                let delayTime = Math.min(baseInterval * backoffMultiplier, 30000);
+                
+                // 🔧 Firefox额外增加延迟
+                if (this.isFirefox && this.reconnectAttempts > 2) {
+                    delayTime = Math.min(delayTime * 1.3, 30000); // Firefox延迟增加30%
+                    console.log(`🦊 Firefox: 调整重连延迟 +30%`);
+                }
+                
+                console.log(`🔄 ${(delayTime / 1000).toFixed(1)}秒后继续重连 (第${this.reconnectAttempts}次，退避: ${backoffMultiplier.toFixed(1)}x)`);
                 
                 this.reconnectTimeOut = setTimeout(() => {
                     if (this.isReconnecting && !this.isUserClose && this.shouldAutoReconnect && !this.isUserExitApp && !this.disableAutoReconnect) {
@@ -969,8 +1017,17 @@ class websocketUtils {
         // #ifdef H5
         if (typeof navigator !== 'undefined' && 'onLine' in navigator) {
             const navigatorOnline = navigator.onLine;
-            // console.log('网络状态检查: navigator.onLine =', navigatorOnline);
-            this.isNetworkAvailable = navigatorOnline;
+            
+            // 🔧 Firefox: 不完全信任 navigator.onLine
+            // Firefox 的 navigator.onLine 在服务器关闭时可能不准确
+            if (this.isFirefox) {
+                // 假设网络总是可用，让实际连接来判断
+                this.isNetworkAvailable = true;
+                console.log('🦊 Firefox: 忽略 navigator.onLine=', navigatorOnline, '假设网络可用');
+            } else {
+                this.isNetworkAvailable = navigatorOnline;
+                // console.log('网络状态检查: navigator.onLine =', navigatorOnline);
+            }
         }
         // #endif
         

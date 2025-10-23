@@ -129,9 +129,16 @@
     "mp-toutiao" : {
         "usingComponents" : true,
         "appid" : ""
-    },
-    "h5" : {
-        "template" : "template.h5.html",
+      },
+      "h5" : {
+          "devServer": {
+              "https": false,
+              "host": "0.0.0.0",
+              "port": 8080,
+              "disableHostCheck": true,
+              "public": "h5.chsg.com:8080"
+            },
+          "template" : "template.h5.html",
         "router" : {
             "mode" : "hash",
             "base" : "/"
