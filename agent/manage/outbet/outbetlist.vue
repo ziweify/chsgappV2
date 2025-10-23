@@ -33,5 +33,6 @@ export default {
 .layout {
   height: 100vh;
   background: #f5f5f5;
+  overflow: visible; /* 允许弹窗显示 */
 }
 </style>

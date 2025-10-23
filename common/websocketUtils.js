@@ -183,29 +183,36 @@ class websocketUtils {
         if (typeof document !== 'undefined') {
             const visibilityChangeHandler = () => {
                 if (document.visibilityState === 'visible') {
-                    // console.log('H5: 页面变为可见，检查连接状态');
-                    // 页面变为可见时，只在WebSocket未连接时才重连
-                    if (!this.isOpenSocket && !this.isUserClose && this.shouldAutoReconnect) {
-                        this.debouncedReconnect('page_visible');
-                    }
+                    console.log('🌞 H5: 页面变为可见，智能检测连接状态');
+                    
+                    // ✅ 改进：页面恢复时不立即重连，先检测连接是否真的断开
+                    // 给服务器一些时间处理，避免fd冲突
+                    setTimeout(() => {
+                        // 再次检查条件，确保在延迟期间状态没有变化
+                        if (!this.isOpenSocket && !this.isUserClose && this.shouldAutoReconnect && !this.isUserExitApp) {
+                            console.log('🔍 检测到连接已断开，准备重连');
+                            this.debouncedReconnect('page_visible_delayed');
+                        } else {
+                            console.log('✅ 连接状态正常，无需重连');
+                        }
+                    }, 800); // ✅ 延迟800ms，给服务器足够时间清理旧fd
                 } else {
-                    // console.log('H5: 页面变为隐藏');
+                    console.log('🌙 H5: 页面变为隐藏，保持连接');
+                    // ✅ 页面隐藏时不做任何操作，让连接自然保持
                 }
             };
             
             // 监听页面可见性变化
             document.addEventListener('visibilitychange', visibilityChangeHandler);
             
-            // 监听窗口焦点变化（作为备用）
-            window.addEventListener('focus', () => {
-                // console.log('H5: 窗口获得焦点');
-                // 只在WebSocket未连接时才重连，避免与页面可见性监听冲突
-                if (!this.isOpenSocket && !this.isUserClose && this.shouldAutoReconnect) {
-                    this.debouncedReconnect('window_focus');
-                }
-            });
+            // ❌ 移除window.focus监听，避免与visibilitychange重复触发
+            // window.addEventListener('focus', () => {
+            //     if (!this.isOpenSocket && !this.isUserClose && this.shouldAutoReconnect) {
+            //         this.debouncedReconnect('window_focus');
+            //     }
+            // });
             
-            // console.log('H5: 页面可见性监听已初始化，当前状态:', document.visibilityState);
+            console.log('H5: 页面可见性监听已初始化（优化版），当前状态:', document.visibilityState);
         }
     }
 

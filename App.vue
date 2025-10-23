@@ -104,6 +104,52 @@ page,body,html {
   height: 100%;
   background: transparent;
 }
+
+/* 提升 uni.showModal 的 z-index 层级，避免被其他组件遮挡 */
+/* #ifdef H5 */
+uni-modal {
+  z-index: 99999999 !important;
+}
+uni-modal .uni-modal {
+  z-index: 99999999 !important;
+}
+uni-modal .uni-modal__mask {
+  z-index: 99999999 !important;
+}
+uni-modal .uni-modal__container {
+  z-index: 99999999 !important;
+}
+/* #endif */
+
+/* #ifdef MP-WEIXIN */
+uni-modal {
+  z-index: 99999999 !important;
+}
+uni-modal .uni-modal {
+  z-index: 99999999 !important;
+}
+uni-modal .uni-modal__mask {
+  z-index: 99999999 !important;
+}
+uni-modal .uni-modal__container {
+  z-index: 99999999 !important;
+}
+/* #endif */
+
+/* #ifdef APP-PLUS */
+uni-modal {
+  z-index: 99999999 !important;
+}
+uni-modal .uni-modal {
+  z-index: 99999999 !important;
+}
+uni-modal .uni-modal__mask {
+  z-index: 99999999 !important;
+}
+uni-modal .uni-modal__container {
+  z-index: 99999999 !important;
+}
+/* #endif */
 /* #endif */
 /* #ifdef APP-NVUE */
 .contet{

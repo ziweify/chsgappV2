@@ -168,7 +168,7 @@
   </view>
 
   <!-- 配置详情弹窗 -->
-  <u-popup :show="showDetailPopup" mode="center" :closeOnClickOverlay="true" @close="closeDetailPopup" :safeAreaInsetTop="true" :customStyle="{'width':'100%','height':'100%','max-width':'100vw','border-radius':'0','overflow':'visible'}">
+  <u-popup :show="showDetailPopup" mode="center" :closeOnClickOverlay="true" @close="closeDetailPopup" :safeAreaInsetTop="true" :zIndex="99999999" :customStyle="{'width':'100%','height':'100%','max-width':'100vw','border-radius':'0','overflow':'visible'}">
       <view class="detail-popup">
         <view class="popup-header">
           <view class="header-left">
@@ -277,7 +277,7 @@
     </u-popup>
 
     <!-- 删除确认弹窗 -->
-    <u-modal confirm-text="确定删除" :show="showDeleteDialog" @confirm="confirmDelete" @cancel="showDeleteDialog = false" confirmColor="#ee0a24" :showCancelButton="true">
+    <u-modal confirm-text="确定删除" :show="showDeleteDialog" @confirm="confirmDelete" @cancel="showDeleteDialog = false" confirmColor="#ee0a24" :showCancelButton="true" :zIndex="99999999">
       <view class="slot-content" style="padding:20rpx;">
         <text>确定要删除配置「{{ toDeleteConfig.name }}」吗？</text>
         <text style="color:#ee0a24;font-size:28rpx;margin-top:10rpx;display:block;">删除后无法恢复，请谨慎操作！</text>
@@ -285,7 +285,7 @@
     </u-modal>
 
     <!-- 试用申请确认弹窗 -->
-    <u-modal confirm-text="确定申请" :show="showTrialDialog" @confirm="confirmTrialApplication" @cancel="showTrialDialog = false" :showCancelButton="true">
+    <u-modal confirm-text="确定申请" :show="showTrialDialog" @confirm="confirmTrialApplication" @cancel="showTrialDialog = false" :showCancelButton="true" :zIndex="99999999">
       <view class="slot-content" style="padding:20rpx;">
         <text>确定要申请试用打单功能吗？</text>
         <text style="color:#007aff;font-size:28rpx;margin-top:10rpx;display:block;">每次可试用{{ configInfo.outbet_sy_time || 30 }}分钟</text>
@@ -293,7 +293,7 @@
     </u-modal>
 
     <!-- 开通申请确认弹窗 -->
-    <u-modal confirm-text="确定开通" :show="showOpenDialog" @confirm="confirmOpenApplication" @cancel="showOpenDialog = false" :showCancelButton="true">
+    <u-modal confirm-text="确定开通" :show="showOpenDialog" @confirm="confirmOpenApplication" @cancel="showOpenDialog = false" :showCancelButton="true" :zIndex="99999999">
       <view class="slot-content" style="padding:20rpx;">
         <text>确定要开通{{ openDuration }}的打单功能吗？</text>
         <text style="color:#ff6b35;font-size:28rpx;margin-top:10rpx;display:block;">费用：{{ openPrice || 0 }}百胜币</text>
@@ -746,7 +746,11 @@ export default {
       const typeMap = {
         1: 'A类盘口',
         2: 'B类盘口',
-        3: 'C类盘口'
+        3: 'C类盘口',
+        'daji': '大吉',
+        'sg': 'SG',
+        'tongbao': '通宝',
+        'other': '其他'
       };
       return typeMap[type] || '未知类型';
     },
@@ -993,7 +997,7 @@ export default {
   background: #f5f5f5;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   
   // 弹窗模式下的样式调整
   &.popup-mode {
@@ -1326,6 +1330,7 @@ export default {
   padding: 15rpx;
   flex: 1; // 占据剩余所有空间
   overflow-y: auto; // 允许垂直滚动
+  overflow-x: visible; // 允许水平方向显示弹窗
   background: #f5f5f5;
   
   // 弹窗模式下的样式调整

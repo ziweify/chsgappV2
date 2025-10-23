@@ -144,9 +144,6 @@
         "title" : "SG",
         "sdkConfigs" : {
             "maps" : {}
-        },
-        "devServer" : {
-            "https" : false
         }
     },
     "vueVersion" : "2",

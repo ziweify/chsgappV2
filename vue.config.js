@@ -13,6 +13,9 @@
 // 原版
 module.exports = {
   devServer: {
+    host: '0.0.0.0',  // 允许外部访问
+    port: 8080,       // 端口号
+    disableHostCheck: true,  // 禁用主机检查
     proxy: {
       '/api': {
         target: 'http://adm.jys.com',
