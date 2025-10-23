@@ -3306,7 +3306,8 @@ export default {
           uni.$socketUtils.reconnectLock = false;
           
           // 立即初始化连接
-          uni.$socketUtils.initConnection(true);
+          // ✅ 修复：第三个参数才是isManualCall，不要传url参数
+          uni.$socketUtils.initConnection(null, null, true);
         }
         return;
       }

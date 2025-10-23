@@ -1017,21 +1017,18 @@ class websocketUtils {
         // #ifdef H5
         if (typeof navigator !== 'undefined' && 'onLine' in navigator) {
             const navigatorOnline = navigator.onLine;
+            // console.log('网络状态检查: navigator.onLine =', navigatorOnline);
+            // 🔧 H5环境下假设网络总是可用，让WebSocket连接测试来判断
+            // 避免将"服务器关闭"误判为"网络断开"
+            this.isNetworkAvailable = true;
             
-            // 🔧 Firefox: 不完全信任 navigator.onLine
-            // Firefox 的 navigator.onLine 在服务器关闭时可能不准确
-            if (this.isFirefox) {
-                // 假设网络总是可用，让实际连接来判断
-                this.isNetworkAvailable = true;
-                console.log('🦊 Firefox: 忽略 navigator.onLine=', navigatorOnline, '假设网络可用');
-            } else {
-                this.isNetworkAvailable = navigatorOnline;
-                // console.log('网络状态检查: navigator.onLine =', navigatorOnline);
-            }
+            // H5环境下直接返回，不调用uni.getNetworkType
+            // 避免异步回调覆盖我们的设置
+            return;
         }
         // #endif
         
-        // 使用uni-app API检查网络状态
+        // 非H5环境使用uni-app API检查网络状态
         uni.getNetworkType({
             success: (res) => {
                 const isConnected = res.networkType !== 'none';
