@@ -47,9 +47,9 @@
               :showLoading="true" 
               :showError="true"
               :src="toConImageUrl(item.content)" 
-              mode="aspectFit" 
-              width="350rpx" 
-              height="250rpx"
+              mode="aspectFill" 
+              width="200rpx" 
+              height="253rpx"
               :lazy="true"
               :fade="true"
               @click="clickImg(toConImageUrl(item.content))"
@@ -275,6 +275,8 @@
     max-width: 500rpx;
     word-break: break-all;
     background-color: transparent; /* 确保容器背景透明 */
+    margin-left: 0; /* 确保图片靠左显示 */
+    align-self: flex-start; /* 让图片容器靠左对齐 */
     
     /* 为聊天图片容器添加固定尺寸，防止布局跳跃 */
     .chat-content-image {
@@ -322,9 +324,9 @@
     
     /* 兼容旧版本image标签 */
     image{
-      object-fit: contain;
-      width: 440rpx;
-      height: 302rpx;
+      object-fit: cover;
+      width: 200rpx;
+      height: 253rpx;
     }
   }
 </style>

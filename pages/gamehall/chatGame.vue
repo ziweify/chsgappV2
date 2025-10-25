@@ -128,7 +128,7 @@
                 <view class="msg-cont nomar">
                   <view v-if="item.sender != uid" class="arrow"></view>
                   <view class="img" v-if="item.chatType == 'image'">
-                    <image width="220" height="150.69" class="imgCon" :data-src="imgurl+item.content" @click="clickImg" :src="imgurl+item.content" lazy="loaded"></image>
+                    <image width="133" height="169" class="imgCon" :data-src="imgurl+item.content" @click="clickImg" :src="imgurl+item.content" lazy="loaded" mode="aspectFill"></image>
                   </view>
                   <view class="text" v-if="item.chatType == 'text'"  @longpress="onLongPress($event,item)">
                     <text v-if="item.isA" class="name">@{{ item.isA }}</text>
@@ -2166,6 +2166,11 @@ export default {
   position: relative;
 }
 
+/* 图片消息特殊处理：去除左边距，让图片靠左显示 */
+.msg-item .message-content .msg-cont.nomar {
+  margin-left: 0;
+}
+
 .msg-item .message-content .msg-cont .btnCon {
   position: absolute;
   background-color: #fff;
@@ -2210,13 +2215,14 @@ export default {
   word-break: break-all;
   background-color: #fff;
   border-radius: 8rpx;
+  margin-left: 0; /* 移除左边距，让图片靠左显示 */
 }
 
 .msg-item .message-content .msg-cont.nomar image {
-  -o-object-fit: contain;
-  object-fit: contain;
-  width: 440rpx;
-  height: 302rpx;
+  -o-object-fit: cover;
+  object-fit: cover;
+  width: 267rpx;
+  height: 339rpx;
 }
 
 .msg-item .message-content .msg-cont .van-image {
