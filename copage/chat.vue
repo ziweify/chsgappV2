@@ -315,13 +315,20 @@
                 <view class="switch span1" @click="switchGame">
                   <image src="/static/image/icon/qiegame.png"></image>
                 </view>
-                <view class="fullscreen-panel span1" @click="showFullScreenPanel">
+                <!-- 打单配置 - 只对房主和房主子账号显示 -->
+                <view v-if="utype == 1" class="fullscreen-panel span1" @click="showFullScreenPanel">
                   <text class="betting-icon">⚙️</text>
-                  <text class="span1-text">打单配置</text>
+                  <text class="span1-text" style="color: #FF9800;">打单</text>
                 </view>
-                <view class="user-management span1" @click="showUserManagementPanel">
+                <!-- 用户管理 - 只对房主和房主子账号显示 -->
+                <view v-if="utype == 1" class="user-management span1" @click="showUserManagementPanel">
                   <text class="user-icon">👥</text>
-                  <text class="span1-text">用户管理</text>
+                  <text class="span1-text" style="color: #FF9800;">用户</text>
+                </view>
+                <!-- 房间设置 - 只对房主和房主子账号显示 -->
+                <view v-if="utype == 1" class="room-settings span1" @click="showRoomSettingsPanel">
+                  <text class="room-icon">🏠</text>
+                  <text class="span1-text" style="color: #FF9800;">房间</text>
                 </view>
                 <view class="customer span1" @click="customerTo">
                   <image src="/static/image/icon/customer.png"></image>
@@ -499,7 +506,7 @@
       <u-popup :show="isShowFullScreenPanel" mode="center" :closeOnClickOverlay="true" @close="closeBettingCenter" :safeAreaInsetTop="true" :customStyle="{'width':'95%','height':'90%','max-width':'800px','border-radius':'16px','overflow':'visible'}">
         <view class="quick-config-panel">
           <view class="quick-config-header">
-            <text class="header-title">快捷打单配置</text>
+            <text class="header-title">打单配置</text>
             <view class="header-close" @click="closeBettingCenter">
               <u-icon name="close" color="#fff" size="20"></u-icon>
             </view>
@@ -511,6 +518,26 @@
               :backUrl="'copage/chat'"
               @addConfig="handleAddConfig"
               @editConfig="handleEditConfig"
+            />
+          </view>
+        </view>
+      </u-popup>
+      
+      <!-- 房间设置弹窗 -->
+      <u-popup :show="isShowRoomSettingsPanel" mode="center" :closeOnClickOverlay="true" @close="closeRoomSettingsPanel" :safeAreaInsetTop="true" :customStyle="{'width':'95%','height':'85%','max-width':'800px','border-radius':'16px','overflow':'visible'}">
+        <view class="room-settings-panel">
+          <view class="room-settings-header">
+            <text class="header-title">房间设置</text>
+            <view class="header-close" @click="closeRoomSettingsPanel">
+              <u-icon name="close" color="#fff" size="20"></u-icon>
+            </view>
+          </view>
+          <view class="room-settings-content">
+            <!-- 使用可复用的房间设置组件 -->
+            <RoomSettingsComponent 
+              :isPopupMode="true" 
+              :backUrl="'copage/chat'"
+              @navigate="handleRoomSettingsNavigate"
             />
           </view>
         </view>
@@ -694,13 +721,15 @@ import CustomCollapse from '@/components/custom-collapse/custom-collapse.vue';
 import CustomCollapseItem from '@/components/custom-collapse/custom-collapse-item.vue';
 import OutbetConfigComponent from '@/components/OutbetConfigComponent.vue';
 import UserListComponent from '@/components/UserListComponent.vue';
+import RoomSettingsComponent from '@/components/RoomSettingsComponent.vue';
 import clipboardUtils from '@/common/clipboardUtils.js';
 export default {
   components: {
     CustomCollapse,
     CustomCollapseItem,
     OutbetConfigComponent,
-    UserListComponent
+    UserListComponent,
+    RoomSettingsComponent
   },
   mixins: [uni.$mymixin],
   data() {
@@ -731,6 +760,7 @@ export default {
       isBettingCenterClosing: false, // 标记是否正在关闭打单中心弹窗
       isShowUserManagementPanel: false, // 用户管理面板
       currentUserTab: 'users', // 当前用户管理标签页
+      isShowRoomSettingsPanel: false, // 房间设置面板
       pendingMessages: [], // 待显示的消息缓存（当不在底部时）
       lastSyncCheck: 0, // 上次WebSocket状态检测时间
       recentlyCorrected: false, // 是否最近刚修正过状态
@@ -3171,6 +3201,21 @@ export default {
       console.log('👥 切换用户管理标签页:', tab);
       this.currentUserTab = tab;
     },
+    showRoomSettingsPanel() {
+      console.log('🏠 点击房间设置按钮，当前状态:', this.isShowRoomSettingsPanel);
+      this.isShowRoomSettingsPanel = !this.isShowRoomSettingsPanel;
+      console.log('🏠 房间设置弹窗状态已切换为:', this.isShowRoomSettingsPanel);
+    },
+    closeRoomSettingsPanel() {
+      console.log('🏠 关闭房间设置弹窗');
+      this.isShowRoomSettingsPanel = false;
+    },
+    handleRoomSettingsNavigate(url) {
+      console.log('🏠 房间设置导航:', url);
+      // 关闭弹窗并跳转
+      this.closeRoomSettingsPanel();
+      uni.$utils.jump(url);
+    },
     
     closeBettingCenter() {
       console.log('🚪 关闭打单中心弹窗，设置保护标志');
@@ -4893,6 +4938,68 @@ export default {
   }
 }
 
+/* 房间设置按钮样式 - 绿色背景，与其他管理按钮统一 */
+.room-settings.span1 {
+  background: #4CAF50 !important; /* 绿色背景，与打单配置、用户管理按钮统一 */
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  
+  .room-icon {
+    font-size: 30rpx;
+    margin-bottom: 4rpx;
+  }
+}
+
+/* 房间设置弹窗样式 */
+.room-settings-panel {
+  background: #fff;
+  border-radius: 16rpx;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  
+  .room-settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18rpx 30rpx; /* 进一步减小高度 */
+    background: linear-gradient(135deg, #0087B4, #006699); /* 保持蓝色渐变用于弹窗标题 */
+    color: #fff;
+    
+    .header-title {
+      font-size: 28rpx; /* 进一步缩小字体 */
+      font-weight: 600;
+    }
+    
+    .header-close {
+      width: 48rpx; /* 进一步缩小关闭按钮 */
+      height: 48rpx;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+    }
+  }
+  
+  .room-settings-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20rpx;
+    background: #f8f9fa; /* 浅色背景 */
+  }
+}
+
 .span1-text {
   font-size: 20rpx;
   color: white;
@@ -4911,34 +5018,29 @@ export default {
 }
 
 .quick-config-header {
-  height: 60rpx;
-  background: #007aff;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0 20rpx;
-  flex-shrink: 0;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
+  justify-content: space-between;
+  padding: 18rpx 30rpx; /* 统一高度 */
+  background: linear-gradient(135deg, #0087B4, #006699); /* 统一蓝色渐变 */
+  color: #fff;
 }
 
 .header-title {
-  font-size: 32rpx;
-  font-weight: bold;
+  font-size: 28rpx; /* 统一字体大小 */
+  font-weight: 600;
   color: #fff;
 }
 
 .header-close {
-  width: 60rpx;
-  height: 60rpx;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.2);
+  width: 48rpx; /* 统一关闭按钮大小 */
+  height: 48rpx;
   border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 
 .quick-config-content {
@@ -4967,30 +5069,31 @@ export default {
 }
 
 .user-management-header {
-  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-  color: white;
-  padding: 20rpx 32rpx;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  justify-content: space-between;
+  padding: 18rpx 30rpx; /* 统一高度 */
+  background: linear-gradient(135deg, #0087B4, #006699); /* 统一蓝色渐变 */
+  color: #fff;
   
   .header-title {
-    font-size: 32rpx;
-    font-weight: bold;
+    font-size: 28rpx; /* 统一字体大小 */
+    font-weight: 600;
   }
   
   .header-close {
-    width: 60rpx;
-    height: 60rpx;
+    width: 48rpx; /* 统一关闭按钮大小 */
+    height: 48rpx;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
   }
 }
 
