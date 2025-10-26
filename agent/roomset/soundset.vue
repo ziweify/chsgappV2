@@ -28,7 +28,7 @@ export default {
     return {
       audio:null,
       volume:1,
-      backUrl:'agent/roomset/roomset',
+      backUrl:'agent/roomset/roomset', // 默认返回地址
       show:false,
       sounds:[],
       sounds1:[],
@@ -44,7 +44,13 @@ export default {
       isReciveMsg:1
     };
   },
-  onLoad() {
+  onLoad(options) {
+    // 如果URL中有returnUrl参数，使用它作为返回地址
+    if (options && options.returnUrl) {
+      this.backUrl = decodeURIComponent(options.returnUrl);
+      console.log('🔊 通知铃声页面接收到返回地址:', this.backUrl);
+    }
+    
     let isReciveMsg = uni.getStorageSync('isReciveMsg');
     if(parseInt(isReciveMsg)  == 0){
       this.isReciveMsg = 0;

@@ -527,18 +527,60 @@
       <u-popup :show="isShowRoomSettingsPanel" mode="center" :closeOnClickOverlay="true" @close="closeRoomSettingsPanel" :safeAreaInsetTop="true" :customStyle="{'width':'95%','height':'85%','max-width':'800px','border-radius':'16px','overflow':'visible'}">
         <view class="room-settings-panel">
           <view class="room-settings-header">
-            <text class="header-title">房间设置</text>
+            <view class="header-left">
+              <!-- 返回按钮，只在非主页面时显示 -->
+              <view v-if="currentRoomSettingsPage !== 'main'" class="header-back" @click="goBackInRoomSettings">
+                <u-icon name="arrow-left" color="#fff" size="20"></u-icon>
+              </view>
+            </view>
+            <text class="header-title">{{ getRoomSettingsPageTitle() }}</text>
             <view class="header-close" @click="closeRoomSettingsPanel">
               <u-icon name="close" color="#fff" size="20"></u-icon>
             </view>
           </view>
           <view class="room-settings-content">
-            <!-- 使用可复用的房间设置组件 -->
+            <!-- 主页面：房间设置 -->
             <RoomSettingsComponent 
+              v-if="currentRoomSettingsPage === 'main'"
               :isPopupMode="true" 
               :backUrl="'copage/chat'"
-              @navigate="handleRoomSettingsNavigate"
+              @navigate="handleRoomSettingsInternalNavigate"
             />
+            
+            <!-- 游戏设置页面 -->
+            <GameSettingsComponent 
+              v-if="currentRoomSettingsPage === 'gameset'"
+              :isPopupMode="true"
+              @saved="onGameSettingsSaved"
+            />
+            
+            <!-- 其他页面的简化版本（临时） -->
+            <view v-if="currentRoomSettingsPage !== 'main' && currentRoomSettingsPage !== 'gameset'" class="embedded-page">
+              <view class="page-header">
+                <text class="page-title">{{ getRoomSettingsPageTitle() }}</text>
+                <text class="page-subtitle">弹窗内简化版本</text>
+              </view>
+              
+              <view class="page-actions">
+                <view class="action-button primary" @click="openFullPage">
+                  <u-icon name="external-link" color="#fff" size="16"></u-icon>
+                  <text>打开完整页面</text>
+                </view>
+                <view class="action-button secondary" @click="goBackInRoomSettings">
+                  <u-icon name="arrow-left" color="#666" size="16"></u-icon>
+                  <text>返回房间设置</text>
+                </view>
+              </view>
+              
+              <view class="page-content">
+                <text class="content-text">
+                  完整的{{ getRoomSettingsPageTitle() }}功能请点击上方"打开完整页面"按钮。
+                </text>
+                <text class="content-text">
+                  这里可以显示一些快捷设置选项。
+                </text>
+              </view>
+            </view>
           </view>
         </view>
       </u-popup>
@@ -722,6 +764,7 @@ import CustomCollapseItem from '@/components/custom-collapse/custom-collapse-ite
 import OutbetConfigComponent from '@/components/OutbetConfigComponent.vue';
 import UserListComponent from '@/components/UserListComponent.vue';
 import RoomSettingsComponent from '@/components/RoomSettingsComponent.vue';
+import GameSettingsComponent from '@/components/GameSettingsComponent.vue';
 import clipboardUtils from '@/common/clipboardUtils.js';
 export default {
   components: {
@@ -729,7 +772,8 @@ export default {
     CustomCollapseItem,
     OutbetConfigComponent,
     UserListComponent,
-    RoomSettingsComponent
+    RoomSettingsComponent,
+    GameSettingsComponent
   },
   mixins: [uni.$mymixin],
   data() {
@@ -761,6 +805,8 @@ export default {
       isShowUserManagementPanel: false, // 用户管理面板
       currentUserTab: 'users', // 当前用户管理标签页
       isShowRoomSettingsPanel: false, // 房间设置面板
+      currentRoomSettingsPage: 'main', // 当前房间设置页面：main, gameset, msgset, soundset, modifypwd
+      roomSettingsPageStack: ['main'], // 房间设置页面栈，用于返回导航
       pendingMessages: [], // 待显示的消息缓存（当不在底部时）
       lastSyncCheck: 0, // 上次WebSocket状态检测时间
       recentlyCorrected: false, // 是否最近刚修正过状态
@@ -3209,12 +3255,94 @@ export default {
     closeRoomSettingsPanel() {
       console.log('🏠 关闭房间设置弹窗');
       this.isShowRoomSettingsPanel = false;
+      // 重置页面状态
+      this.currentRoomSettingsPage = 'main';
+      this.roomSettingsPageStack = ['main'];
     },
+    
+    // 获取当前页面标题
+    getRoomSettingsPageTitle() {
+      const titles = {
+        'main': '房间设置',
+        'gameset': '游戏设置', 
+        'msgset': '消息设置',
+        'soundset': '通知铃声',
+        'modifypwd': '修改密码'
+      };
+      return titles[this.currentRoomSettingsPage] || '房间设置';
+    },
+    
+    // 弹窗内部导航
+    handleRoomSettingsInternalNavigate(url) {
+      console.log('🏠 房间设置内部导航:', url);
+      
+      // 解析URL，提取页面类型
+      let pageType = 'main';
+      if (url.includes('gameset')) {
+        pageType = 'gameset';
+      } else if (url.includes('msgset')) {
+        pageType = 'msgset';
+      } else if (url.includes('soundset')) {
+        pageType = 'soundset';
+      } else if (url.includes('modifypwd')) {
+        pageType = 'modifypwd';
+      }
+      
+      // 添加到页面栈
+      this.roomSettingsPageStack.push(pageType);
+      this.currentRoomSettingsPage = pageType;
+      
+      console.log('🏠 页面栈:', this.roomSettingsPageStack);
+    },
+    
+    // 在房间设置弹窗内返回上一页
+    goBackInRoomSettings() {
+      console.log('🏠 房间设置返回，当前栈:', this.roomSettingsPageStack);
+      
+      if (this.roomSettingsPageStack.length > 1) {
+        // 移除当前页面
+        this.roomSettingsPageStack.pop();
+        // 切换到上一页
+        this.currentRoomSettingsPage = this.roomSettingsPageStack[this.roomSettingsPageStack.length - 1];
+        
+        console.log('🏠 返回到页面:', this.currentRoomSettingsPage);
+      }
+    },
+    
+    // 打开完整页面
+    openFullPage() {
+      const pageMap = {
+        'gameset': 'agent/roomset/gameset',
+        'msgset': 'agent/roomset/msgset',
+        'soundset': 'agent/roomset/soundset',
+        'modifypwd': 'agent/common/modifypwd'
+      };
+      
+      const url = pageMap[this.currentRoomSettingsPage];
+      if (url) {
+        console.log('🏠 打开完整页面:', url);
+        this.handleRoomSettingsNavigate(url);
+      }
+    },
+    
+    // 游戏设置保存成功回调
+    onGameSettingsSaved() {
+      console.log('🎮 游戏设置保存成功');
+      // 可以在这里添加一些反馈，比如显示成功提示
+      // 或者刷新相关数据
+    },
+    
     handleRoomSettingsNavigate(url) {
-      console.log('🏠 房间设置导航:', url);
-      // 关闭弹窗并跳转
+      console.log('🏠 房间设置导航（外部跳转）:', url);
+      // 关闭弹窗并跳转，传递返回地址参数
       this.closeRoomSettingsPanel();
-      uni.$utils.jump(url);
+      
+      // 在URL中添加返回地址参数
+      const returnUrl = encodeURIComponent('copage/chat');
+      const separator = url.includes('?') ? '&' : '?';
+      const urlWithReturn = `${url}${separator}returnUrl=${returnUrl}`;
+      
+      uni.$utils.jump(urlWithReturn);
     },
     
     closeBettingCenter() {
@@ -4971,9 +5099,33 @@ export default {
     background: linear-gradient(135deg, #0087B4, #006699); /* 保持蓝色渐变用于弹窗标题 */
     color: #fff;
     
+    .header-left {
+      width: 48rpx; /* 与关闭按钮同宽，保持对称 */
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    
+    .header-back {
+      width: 48rpx;
+      height: 48rpx;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+    }
+    
     .header-title {
       font-size: 28rpx; /* 进一步缩小字体 */
       font-weight: 600;
+      flex: 1;
+      text-align: center;
     }
     
     .header-close {
@@ -4997,6 +5149,89 @@ export default {
     overflow-y: auto;
     padding: 20rpx;
     background: #f8f9fa; /* 浅色背景 */
+  }
+  
+  .embedded-page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 30rpx;
+    
+    .page-header {
+      text-align: center;
+      margin-bottom: 40rpx;
+      
+      .page-title {
+        font-size: 32rpx;
+        font-weight: 600;
+        color: #333;
+        display: block;
+        margin-bottom: 10rpx;
+      }
+      
+      .page-subtitle {
+        font-size: 24rpx;
+        color: #666;
+        display: block;
+      }
+    }
+    
+    .page-actions {
+      display: flex;
+      gap: 20rpx;
+      margin-bottom: 40rpx;
+      
+      .action-button {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10rpx;
+        padding: 20rpx;
+        border-radius: 12rpx;
+        cursor: pointer;
+        
+        &.primary {
+          background: #0087B4;
+          color: #fff;
+          
+          &:hover {
+            background: #006699;
+          }
+        }
+        
+        &.secondary {
+          background: #f5f5f5;
+          color: #666;
+          border: 1px solid #ddd;
+          
+          &:hover {
+            background: #e9e9e9;
+          }
+        }
+        
+        text {
+          font-size: 28rpx;
+        }
+      }
+    }
+    
+    .page-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      
+      .content-text {
+        font-size: 28rpx;
+        color: #666;
+        line-height: 1.6;
+        margin-bottom: 20rpx;
+        display: block;
+      }
+    }
   }
 }
 

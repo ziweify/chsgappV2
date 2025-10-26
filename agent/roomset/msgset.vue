@@ -77,7 +77,7 @@ export default {
   mixins: [uni.$mymixin],
   data() {
     return {
-      backUrl: 'agent/roomset/roomset',
+      backUrl: 'agent/roomset/roomset', // 默认返回地址
       msgList: [],
       gameList:[],
       curItem:{},
@@ -88,7 +88,13 @@ export default {
       type:1,
     }
   },
-  onLoad() {
+  onLoad(options) {
+    // 如果URL中有returnUrl参数，使用它作为返回地址
+    if (options && options.returnUrl) {
+      this.backUrl = decodeURIComponent(options.returnUrl);
+      console.log('💬 消息设置页面接收到返回地址:', this.backUrl);
+    }
+    
     this.getGameListAll();
   },
   onReady() {
