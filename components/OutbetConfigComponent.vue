@@ -748,6 +748,7 @@ export default {
         2: 'B类盘口',
         3: 'C类盘口',
         'daji': '大吉',
+        'sgwin': 'SGWIN',
         'sg': 'SG',
         'tongbao': '通宝',
         'other': '其他'

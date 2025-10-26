@@ -534,15 +534,25 @@ export default {
 
     // 加载打单类型列表
     loadTypeList() {
+      console.log('🔄 开始加载打单类型列表...');
       return this.$u.api.agent.getOutbetTypeList({}).then(res => {
+        console.log('📡 打单类型列表响应:', res);
+        console.log('📡 原始数据 res.data:', res.data);
+        console.log('📡 原始列表 res.data.list:', res.data.list);
+        
         // 将接口返回的数据转换为前端需要的格式
         this.typeList = (res.data.list || []).map(item => ({
           label: item.name,
           value: item.id
         }));
+        
+        console.log('✅ 转换后的类型列表长度:', this.typeList.length);
+        console.log('✅ 转换后的类型列表详细:', JSON.stringify(this.typeList, null, 2));
+        
         this.ishowhebing = res.data.ishowhebing;
         return this.typeList;
       }).catch(err => {
+        console.error('❌ 获取打单类型列表失败:', err);
         this.$u.toast('获取打单类型列表失败');
         return [];
       });
