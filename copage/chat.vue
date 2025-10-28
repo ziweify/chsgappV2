@@ -881,8 +881,24 @@ export default {
       // 聊天记录自动清理相关
       lastScrollTime: Date.now(), // 最后滚动时间
       chatCleanupTimer: null, // 聊天记录清理定时器
-      maxChatRecords: 300, // 最大聊天记录条数
-      scrollInactiveTime: 10 * 60 * 1000, // 10分钟无滑动时间（毫秒）
+      maxChatRecords: 100, // 最大聊天记录条数（从300优化到100）
+      scrollInactiveTime: 5 * 60 * 1000, // 5分钟无滑动时间（从10分钟优化到5分钟）
+      
+      // 性能优化配置
+      performanceConfig: {
+        batchProcessDelay: 200,        // 批处理延迟200ms
+        scrollDebounceDelay: 300,      // 滚动防抖300ms
+        cleanupInterval: 60000,        // 清理间隔1分钟
+        maxMemoryUsage: 100 * 1024 * 1024, // 最大内存使用100MB
+      },
+      
+      // 性能监控
+      performanceStats: {
+        messageCount: 0,
+        lastCleanup: Date.now(),
+        timerCount: 0,
+        listenerCount: 0
+      },
       
       // WebSocket连接状态提示
       showWebSocketError: false, // 是否显示WebSocket连接异常提示
@@ -954,6 +970,12 @@ export default {
     this.clearAllTimers();
     this.clearWebSocketListeners();
     
+    // 清理性能监控定时器
+    if (this.performanceMonitorTimer) {
+      clearInterval(this.performanceMonitorTimer);
+      this.performanceMonitorTimer = null;
+    }
+    
     // 清理键盘监听器
     uni.offKeyboardHeightChange(this.keyboardHeightChange);
     
@@ -974,6 +996,19 @@ export default {
     console.log('🔍 页面初始化 - UID:', this.uid, 'UType:', this.utype, 'UserInfo:', this.userInfo);
     this.template = uni.getStorageSync('ctemplate');
     this.heightArr.statusbarHeight = this.windowObj.statusBarHeight;
+    
+    // 性能优化初始化
+    this.pageStartTime = Date.now();
+    
+    // 初始化防抖方法
+    this.debouncedToBottom = this.debounce(() => {
+      this.toBottom(150);
+    }, this.performanceConfig.scrollDebounceDelay);
+    
+    // 启动性能监控（每30秒检查一次）
+    this.performanceMonitorTimer = setInterval(() => {
+      this.monitorPerformance();
+    }, 30000);
     
     // 设置页面标题为当前登录账号
     if (this.userInfo && this.userInfo.username) {
@@ -2223,6 +2258,98 @@ export default {
     // 更新最后滚动时间（在用户交互时调用）
     updateLastScrollTime() {
       this.lastScrollTime = Date.now();
+    },
+    
+    // ========== 性能优化方法 ==========
+    
+    // 性能监控
+    monitorPerformance() {
+      try {
+        // 更新统计信息
+        this.performanceStats.messageCount = this.chatList.length;
+        this.performanceStats.timerCount = this.getActiveTimersCount();
+        
+        // 检查内存使用（如果浏览器支持）
+        if (performance.memory) {
+          const memoryUsage = performance.memory.usedJSHeapSize;
+          
+          // 如果内存使用过高，触发清理
+          if (memoryUsage > this.performanceConfig.maxMemoryUsage) {
+            console.warn('⚠️ 内存使用过高:', Math.round(memoryUsage / 1024 / 1024) + 'MB');
+            this.performanceCleanup();
+          }
+        }
+        
+        // 检查聊天消息数量
+        if (this.chatList.length > this.maxChatRecords * 0.8) {
+          console.log('📊 聊天消息接近上限:', this.chatList.length + '/' + this.maxChatRecords);
+        }
+        
+        // 每5分钟输出性能统计
+        const now = Date.now();
+        if (now - this.performanceStats.lastCleanup > 5 * 60 * 1000) {
+          this.logPerformanceStats();
+          this.performanceStats.lastCleanup = now;
+        }
+        
+      } catch (error) {
+        console.error('❌ 性能监控失败:', error);
+      }
+    },
+    
+    // 获取活跃定时器数量
+    getActiveTimersCount() {
+      const timerNames = ['periodtimer', 'balancetimer', 'chatCleanupTimer', 'scrollDebounceTimer', 'toBottomTimer'];
+      return timerNames.filter(name => this[name] !== null).length;
+    },
+    
+    // 输出性能统计
+    logPerformanceStats() {
+      const stats = {
+        聊天消息数量: this.performanceStats.messageCount,
+        活跃定时器数量: this.performanceStats.timerCount,
+        内存使用: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB' : '不支持',
+        页面运行时间: Math.round((Date.now() - this.pageStartTime) / 1000 / 60) + '分钟'
+      };
+      console.log('📊 性能统计:', stats);
+    },
+    
+    // 性能清理
+    performanceCleanup() {
+      console.log('🧹 执行性能清理...');
+      
+      // 清理聊天记录
+      if (this.chatList.length > this.maxChatRecords * 0.5) {
+        this.performChatCleanup();
+      }
+      
+      // 清理待显示消息
+      if (this.pendingMessages && this.pendingMessages.length > 20) {
+        this.pendingMessages = this.pendingMessages.slice(-10);
+        console.log('🧹 清理待显示消息');
+      }
+      
+      // 强制垃圾回收（如果浏览器支持）
+      if (window.gc) {
+        window.gc();
+        console.log('🧹 执行垃圾回收');
+      }
+    },
+    
+    // 防抖的滚动到底部方法
+    debouncedToBottom: null, // 将在onLoad中初始化
+    
+    // 防抖工具方法
+    debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func.apply(this, args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
     },
     
     // ========== 原有方法 ==========

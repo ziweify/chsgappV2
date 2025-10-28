@@ -713,7 +713,7 @@ export default {
       // WebSocket消息批量处理
       messageBatchQueue: [], // 消息批处理队列
       messageBatchTimer: null, // 批处理定时器
-      BATCH_PROCESS_DELAY: 200, // 批处理延迟(ms)
+      BATCH_PROCESS_DELAY: 200, // 批处理延迟(ms)（从100ms优化到200ms）
       
       // 发送状态控制
       isSending: false, // 防止重复发送
