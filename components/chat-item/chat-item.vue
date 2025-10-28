@@ -3,7 +3,25 @@
 <!--		<text class="chat-time" v-if="item.time&&item.time.length">
 			{{item.time}}
 		</text>-->
-		<view :class="{'chat-container':true,'chat-location-me':item.sender == uid}">
+		<!-- 系统消息特殊显示 -->
+		<view v-if="isSystemMessage" class="system-message-container">
+			<view class="system-message-wrapper" :class="`theme-${systemMessageTheme.theme}`">
+				<view class="system-message-content">
+					<view class="system-message-header">
+						<view class="system-message-left">
+							<text class="system-icon">{{ systemMessageTheme.icon }}</text>
+							<text class="system-message-title">系统消息</text>
+						</view>
+						<text class="system-message-time">{{ timeFormat(item.time) }}</text>
+					</view>
+					<view class="system-message-text">
+						<rich-text :nodes="item.content"></rich-text>
+					</view>
+				</view>
+			</view>
+		</view>
+		<!-- 普通消息显示 -->
+		<view v-else :class="{'chat-container':true,'chat-location-me':item.sender == uid}">
 			<view class="chat-icon-container">
 <!--				<image class="chat-icon" :src="toImageUrl(item.avatar)" mode="aspectFill" />-->
         <u-image :shape="shape" class="chat-icon" :showLoading="true" :src="toImageUrl(item.avatar)" mode="aspectFill" width="40" height="40">
@@ -122,6 +140,57 @@
 			return {
         previewImageFlag:false,
 			};
+		},
+		computed: {
+			// 判断是否为系统消息
+			isSystemMessage() {
+				return this.item && (
+					this.item.sender === 0 || 
+					this.item.sender === '0' || 
+					this.item.nickname === '系统消息' ||
+					this.item.nickname === '系统' ||
+					this.item.nickname === '系统管理员'
+				);
+			},
+			// 系统消息图标和主题
+			systemMessageTheme() {
+				if (!this.isSystemMessage) return null;
+				
+				// 优先使用后端配置的主题
+				if (this.item.systemTheme && this.item.systemIcon) {
+					return { 
+						icon: this.item.systemIcon, 
+						theme: this.item.systemTheme 
+					};
+				} else if (this.item.systemTheme) {
+					// 有主题配置但没有自定义图标，使用主题默认图标
+					const defaultIcons = {
+						'default': '📢',
+						'info': '📢',
+						'success': '🎉',
+						'warning': '⚠️',
+						'error': '❌'
+					};
+					return { 
+						icon: defaultIcons[this.item.systemTheme] || '📢', 
+						theme: this.item.systemTheme 
+					};
+				}
+				
+				// 后备方案：根据消息内容自动判断类型
+				const content = this.item.content || '';
+				if (content.includes('维护') || content.includes('升级') || content.includes('暂停')) {
+					return { icon: '⚠️', theme: 'warning' };
+				} else if (content.includes('恭喜') || content.includes('中奖') || content.includes('获得')) {
+					return { icon: '🎉', theme: 'success' };
+				} else if (content.includes('通知') || content.includes('公告') || content.includes('提醒')) {
+					return { icon: '📢', theme: 'info' };
+				} else if (content.includes('错误') || content.includes('失败') || content.includes('异常')) {
+					return { icon: '❌', theme: 'error' };
+				} else {
+					return { icon: '📢', theme: 'default' };
+				}
+			}
 		},
     methods:{
       timeFormat(time){
@@ -327,6 +396,177 @@
       object-fit: cover;
       width: 200rpx;
       height: 253rpx;
+    }
+  }
+
+  /* 系统消息现代化样式 */
+  .system-message-container {
+    width: 100%;
+    padding: 10rpx 20rpx;
+    display: flex;
+    justify-content: center;
+    animation: systemMessageSlideIn 0.3s ease-out;
+  }
+
+  .system-message-wrapper {
+    border-radius: 12rpx;
+    padding: 16rpx 20rpx;
+    min-width: 500rpx;
+    max-width: 90%;
+    border: 1rpx solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10rpx);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  /* 默认主题 - 蓝紫渐变 */
+  .system-message-wrapper.theme-default {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 8rpx 32rpx rgba(102, 126, 234, 0.3);
+  }
+
+  /* 信息主题 - 蓝色渐变 */
+  .system-message-wrapper.theme-info {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    box-shadow: 0 8rpx 32rpx rgba(79, 172, 254, 0.3);
+  }
+
+  /* 成功主题 - 绿色渐变 */
+  .system-message-wrapper.theme-success {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    box-shadow: 0 8rpx 32rpx rgba(67, 233, 123, 0.3);
+  }
+
+  /* 警告主题 - 橙色渐变 */
+  .system-message-wrapper.theme-warning {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    box-shadow: 0 8rpx 32rpx rgba(250, 112, 154, 0.3);
+  }
+
+  /* 错误主题 - 红色渐变 */
+  .system-message-wrapper.theme-error {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    box-shadow: 0 8rpx 32rpx rgba(255, 107, 107, 0.3);
+  }
+
+  .system-message-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2rpx;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+    animation: shimmer 2s infinite;
+  }
+
+  .system-message-content {
+    color: #ffffff;
+  }
+
+  .system-message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8rpx;
+    padding-bottom: 6rpx;
+    border-bottom: 1rpx solid rgba(255, 255, 255, 0.2);
+  }
+
+  .system-message-left {
+    display: flex;
+    align-items: center;
+    gap: 8rpx;
+  }
+
+  .system-icon {
+    font-size: 24rpx;
+    animation: bounce 2s infinite;
+    flex-shrink: 0;
+  }
+
+  .system-message-title {
+    font-size: 24rpx;
+    font-weight: 600;
+    color: #ffffff;
+    text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
+    flex-shrink: 0;
+  }
+
+  .system-message-time {
+    font-size: 20rpx;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 400;
+    flex-shrink: 0;
+  }
+
+  .system-message-text {
+    font-size: 26rpx;
+    line-height: 1.4;
+    color: #ffffff;
+    text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
+    font-weight: 500;
+  }
+
+  /* 动画效果 */
+  @keyframes systemMessageSlideIn {
+    0% {
+      opacity: 0;
+      transform: translateY(-20rpx) scale(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-6rpx);
+    }
+    60% {
+      transform: translateY(-3rpx);
+    }
+  }
+
+  /* 深色主题适配 */
+  @media (prefers-color-scheme: dark) {
+    .system-message-wrapper.theme-default {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      box-shadow: 0 8rpx 32rpx rgba(15, 52, 96, 0.4);
+    }
+    
+    .system-message-wrapper.theme-info {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      box-shadow: 0 8rpx 32rpx rgba(30, 58, 138, 0.4);
+    }
+    
+    .system-message-wrapper.theme-success {
+      background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+      box-shadow: 0 8rpx 32rpx rgba(6, 95, 70, 0.4);
+    }
+    
+    .system-message-wrapper.theme-warning {
+      background: linear-gradient(135deg, #92400e 0%, #b45309 100%);
+      box-shadow: 0 8rpx 32rpx rgba(146, 64, 14, 0.4);
+    }
+    
+    .system-message-wrapper.theme-error {
+      background: linear-gradient(135deg, #991b1b 0%, #dc2626 100%);
+      box-shadow: 0 8rpx 32rpx rgba(153, 27, 27, 0.4);
     }
   }
 </style>
