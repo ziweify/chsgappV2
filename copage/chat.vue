@@ -1823,7 +1823,10 @@ export default {
           otherType: Array.isArray(data.other) ? 'Array' : typeof data.other,
           msgid: data.other?.msgid,
           sender: data.data?.sender,
-          currentUid: this.uid
+          currentUid: this.uid,
+          manualResend: data.other?.manualResend,
+          eventType: data.eventType,
+          gid: data.gid
         });
         let msg = data.data;
         let shouldShowImmediately = false;
@@ -1851,6 +1854,23 @@ export default {
             this.$nextTick(() => {
               this.chatList = this.chatList.concat(msg);
               this.tmpToButomFlag = false;
+              
+              // 如果是手动重新发送的消息，强制关闭弹窗并滚动到底部显示
+              if (data.other && data.other.manualResend) {
+                console.log('🔄 手动重新发送消息，强制关闭弹窗并滚动到底部');
+                
+                // 强制关闭所有弹窗
+                this.isShowFullScreenPanel = false;
+                this.isShowUserManagementPanel = false;
+                this.isShowRoomSettingsPanel = false;
+                
+                // 延迟滚动，确保弹窗关闭动画完成
+                setTimeout(() => {
+                  this.toBottom(200, false, false);
+                  // 确保isAtBottom状态正确
+                  this.isAtBottom = true;
+                }, 300);
+              }
             });
           } else {
             // 不在底部，缓存消息并增加未读计数
@@ -2009,6 +2029,23 @@ export default {
               this.$nextTick(() => {
                 this.chatList.push(msg);
                 this.tmpToButomFlag = false;
+                
+                // 如果是手动重新发送的单个消息，也要强制关闭弹窗并滚动到底部
+                if (data.other && data.other.manualResend) {
+                  console.log('🔄 手动重新发送单个消息，强制关闭弹窗并滚动到底部');
+                  
+                  // 强制关闭所有弹窗
+                  this.isShowFullScreenPanel = false;
+                  this.isShowUserManagementPanel = false;
+                  this.isShowRoomSettingsPanel = false;
+                  
+                  // 延迟滚动，确保弹窗关闭动画完成
+                  setTimeout(() => {
+                    this.toBottom(200, false, false);
+                    // 确保isAtBottom状态正确
+                    this.isAtBottom = true;
+                  }, 300);
+                }
               });
             } else {
               // 不在底部，缓存消息并增加未读计数
