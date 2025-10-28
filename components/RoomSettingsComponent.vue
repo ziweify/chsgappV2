@@ -31,6 +31,7 @@
 
       <u-cell-group style="background-color: #fff; margin-top: 20rpx;">
         <u-cell title="刷新房号" :isLink="true" @click="refreshNo()"></u-cell>
+        <u-cell title="重新发送开奖图片" :isLink="true" @click="showResendImageDialog()"></u-cell>
       </u-cell-group>
     </view>
 
@@ -93,6 +94,21 @@
         <u-button @click="tipsShow = false" class="btncon">知道了</u-button>
       </view>
     </u-modal>
+
+    <!-- 重新发送开奖图片弹窗 -->
+    <u-modal :show="isShowResendImage" title="重新发送开奖图片" :showConfirmButton="false" :closeOnClickOverlay="false">
+      <view class="resend-image-container">
+        <view class="resend-image-content">
+          <view class="resend-image-icon">📷</view>
+          <view class="resend-image-text">将重新发送当前游戏的最新开奖图片到群聊中</view>
+        </view>
+      </view>
+      
+      <view style="display: flex; margin-top: 40rpx">
+        <u-button @click="closeResendDialog()" class="btncon">取消</u-button>
+        <u-button class="btncon" @click="doResendImage()" :loading="resendLoading">发送</u-button>
+      </view>
+    </u-modal>
   </view>
 </template>
 
@@ -105,6 +121,11 @@ export default {
     isPopupMode: {
       type: Boolean,
       default: false
+    },
+    // 当前游戏ID
+    currentGameId: {
+      type: [String, Number],
+      default: ''
     },
     // 返回URL
     backUrl: {
@@ -140,7 +161,11 @@ export default {
       currentIndex: 0,
       inputValue: '',
       focus: false,
-      headImageDomain: ''
+      headImageDomain: '',
+      
+      // 重新发送开奖图片相关
+      isShowResendImage: false,
+      resendLoading: false
     }
   },
   mounted() {
@@ -302,6 +327,73 @@ export default {
       } else {
         uni.$utils.jump('agent/roomset/soundset');
       }
+    },
+    
+    // 显示重新发送开奖图片弹窗
+    showResendImageDialog() {
+      this.isShowResendImage = true;
+    },
+    
+    // 关闭重新发送对话框
+    closeResendDialog() {
+      this.isShowResendImage = false;
+    },
+    
+    // 执行重新发送开奖图片
+    doResendImage() {
+      // 获取当前游戏ID（优先使用props，然后从存储获取）
+      const currentGameId = this.currentGameId || uni.getStorageSync('cgid') || this.getCurrentGameId();
+      
+      if (!currentGameId) {
+        this.$u.toast('无法获取当前游戏信息');
+        return;
+      }
+      
+      console.log('重新发送开奖图片，游戏ID:', currentGameId);
+      
+      this.resendLoading = true;
+      
+      this.$u.api.agent.resendLotteryImage({
+        gid: currentGameId
+      }).then(res => {
+        this.resendLoading = false;
+        this.closeResendDialog();
+        
+        this.$u.toast(`${res.data.game} 开奖图片发送成功`);
+      }).catch(err => {
+        this.resendLoading = false;
+        this.$u.toast(err.msg || '发送失败');
+      });
+    },
+    
+    // 获取当前游戏ID的辅助方法
+    getCurrentGameId() {
+      // 尝试从多个可能的来源获取当前游戏ID
+      try {
+        // 方法1：从URL参数获取
+        const pages = getCurrentPages();
+        if (pages.length > 0) {
+          const currentPage = pages[pages.length - 1];
+          if (currentPage.options && currentPage.options.gid) {
+            return currentPage.options.gid;
+          }
+        }
+        
+        // 方法2：从全局状态获取
+        if (this.$store && this.$store.state && this.$store.state.currentGameId) {
+          return this.$store.state.currentGameId;
+        }
+        
+        // 方法3：从父组件传递的props获取（如果有的话）
+        if (this.currentGameId) {
+          return this.currentGameId;
+        }
+        
+        return null;
+      } catch (error) {
+        console.error('获取当前游戏ID失败:', error);
+        return null;
+      }
     }
   }
 }
@@ -359,5 +451,34 @@ export default {
 .btncon {
   flex: 1;
   margin: 0 10rpx;
+}
+
+.resend-image-container {
+  padding: 40rpx 20rpx;
+}
+
+.resend-image-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.resend-image-icon {
+  font-size: 80rpx;
+  margin-bottom: 20rpx;
+  opacity: 0.8;
+}
+
+.resend-image-text {
+  font-size: 28rpx;
+  color: #666;
+  line-height: 1.5;
+  max-width: 500rpx;
+}
+
+.game-select-text:empty::before {
+  content: '请选择游戏';
+  color: #999;
 }
 </style>

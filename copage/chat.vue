@@ -543,6 +543,7 @@
             <RoomSettingsComponent 
               v-if="currentRoomSettingsPage === 'main'"
               :isPopupMode="true" 
+              :currentGameId="gid"
               :backUrl="'copage/chat'"
               @navigate="handleRoomSettingsInternalNavigate"
             />
@@ -1833,6 +1834,10 @@ export default {
         } else if (this.tmpToButomFlag) {
           // 用户刚发送消息，强制显示
           shouldShowImmediately = true;
+        } else if (data.other && data.other.manualResend) {
+          // 🔧 新增：手动重新发送的消息总是立即显示
+          shouldShowImmediately = true;
+          console.log('✅ 手动重新发送消息，强制立即显示:', Array.isArray(msg) ? msg.length + '条消息' : msg.content);
         } else if (msg.sender != this.uid) {
           // 🔧 新增：系统回复消息（非自己发送的）总是立即显示
           shouldShowImmediately = true;

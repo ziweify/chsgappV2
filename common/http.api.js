@@ -77,6 +77,7 @@ const install = (Vue, vm) => {
 		getConfigInfo: (params) => http.get("/agent/roomConfig/configInfo",{}),//获取房间配置
 		saveConfig: (params) => http.post("/agent/roomConfig/saveConfig",params),//保存房间配置
 		refreshRoomId: (params) => http.post("/agent/roomConfig/refreshRoomId",params),//刷新房间ID
+		resendLotteryImage: (params) => http.post("/agent/roomConfig/resendLotteryImage",params),//重新发送开奖图片
 		getGameSettingList: (params) => http.get("/agent/roomConfig/getGameSettingList",{}),//获取游戏列表
 		switchGame: (params) => http.post("/agent/roomConfig/switchGame",params),//游戏开关设置
 		saveGameSetting: (params) => http.post("/agent/roomConfig/saveGameSetting",params),//保存游戏设置
