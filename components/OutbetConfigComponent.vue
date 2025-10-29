@@ -365,11 +365,16 @@ export default {
     this.timeUpdateTimer = setInterval(() => {
       this.updateRemainingTime();
     }, 60000);
+    
+    // 🔧 监听WebSocket状态更新消息
+    uni.$on('outbet_status_update', this.handleOutbetStatusUpdate);
   },
   beforeDestroy() {
     if (this.timeUpdateTimer) {
       clearInterval(this.timeUpdateTimer);
     }
+    // 🔧 清理WebSocket监听器
+    uni.$off('outbet_status_update', this.handleOutbetStatusUpdate);
   },
   methods: {
     // 获取配置信息
@@ -754,6 +759,44 @@ export default {
         'other': '其他'
       };
       return typeMap[type] || '未知类型';
+    },
+
+    // 🔧 处理WebSocket状态更新消息
+    handleOutbetStatusUpdate(data) {
+      console.log('📡 收到打单状态更新消息:', data);
+      
+      if (data && data.data) {
+        const updateData = data.data;
+        
+        // 更新配置列表中对应项目的状态
+        const configIndex = this.list.findIndex(item => item.id == updateData.id);
+        if (configIndex !== -1) {
+          console.log('🔄 更新配置状态:', {
+            id: updateData.id,
+            name: updateData.name,
+            enabled: updateData.enabled,
+            balance: updateData.balance
+          });
+          
+          // 使用Vue的响应式更新
+          this.$set(this.list, configIndex, {
+            ...this.list[configIndex],
+            enabled: updateData.enabled,
+            online: updateData.online || 0,
+            balance: updateData.balance || 0,
+            unsettle: updateData.unsettle || 0,
+            profit_loss: updateData.profit_loss || 0
+          });
+          
+          // 显示状态更新提示
+          const statusText = updateData.enabled == 1 ? '已启用' : '已停用';
+          uni.showToast({
+            title: `${updateData.name} ${statusText}`,
+            icon: 'success',
+            duration: 1500
+          });
+        }
+      }
     },
 
     // 获取投注模式标签
