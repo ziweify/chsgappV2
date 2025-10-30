@@ -13,7 +13,7 @@
       <view class="config-info-card">
         <view class="config-header-info">
           <view class="config-title">
-            <text class="title-text">打单系统配置</text>
+            <text class="title-text">开启打单总开关</text>
             <view class="switch-status" :class="configInfo.outbet_switch == 1 ? 'switch-on' : 'switch-off'" @click="toggleSwitch">
               <text class="switch-icon">🔘</text>
               <text class="switch-text">{{ configInfo.outbet_switch == 1 ? '已开启' : '已关闭' }}</text>
@@ -560,6 +560,36 @@ export default {
     // 切换状态
     toggleStatus(item) {
       const newStatus = item.enabled == 1 ? 0 : 1;
+      
+      // 如果是启用操作，需要先检查总开关是否开启
+      if (newStatus == 1) {
+        // 检查总开关是否开启
+        if (this.configInfo.outbet_switch != 1) {
+          uni.showModal({
+            title: '提示',
+            content: '请先开启打单总开关后，再启用配置',
+            showCancel: false,
+            confirmText: '我知道了'
+          });
+          return;
+        }
+        
+        // 检查是否过期
+        if (this.configInfo.outbet_overtime && this.configInfo.outbet_overtime > 0) {
+          const currentTime = Math.floor(Date.now() / 1000);
+          if (currentTime >= this.configInfo.outbet_overtime) {
+            uni.showModal({
+              title: '提示',
+              content: '打单功能已过期，请重新开通后再启用配置',
+              showCancel: false,
+              confirmText: '我知道了'
+            });
+            return;
+          }
+        }
+      }
+      
+      // 执行启用/停用操作
       this.$u.api.agent.updateOutbetStatus({
         id: item.id,
         enabled: newStatus
