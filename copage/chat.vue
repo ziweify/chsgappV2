@@ -3538,10 +3538,9 @@ export default {
       console.log('🔧 处理添加配置事件');
       // 关闭快捷导航弹窗
       this.isShowFullScreenPanel = false;
-      // 跳转到添加配置页面
-      uni.setStorageSync('backUrl', 'copage/chat');
-      
-      const addUrl = 'agent/manage/outbet/addconfig?from=room';
+      // 跳转到添加配置页面，传递正确的返回地址
+      const backUrl = 'copage/chat';
+      const addUrl = 'agent/manage/outbet/addconfig?from=' + encodeURIComponent(backUrl);
       console.log('🔧 准备跳转到添加页面:', addUrl);
       
       try {
@@ -3568,10 +3567,9 @@ export default {
       setTimeout(() => {
         // 关闭快捷导航弹窗
         this.isShowFullScreenPanel = false;
-        // 跳转到编辑配置页面
-        uni.setStorageSync('backUrl', 'copage/chat');
-        
-        const jumpUrl = 'agent/manage/outbet/addconfig?id=' + item.id + '&from=room';
+        // 跳转到编辑配置页面，传递正确的返回地址
+        const backUrl = 'copage/chat';
+        const jumpUrl = 'agent/manage/outbet/addconfig?id=' + item.id + '&from=' + encodeURIComponent(backUrl);
         console.log('🔧 准备跳转到编辑页面:', jumpUrl);
         
         // 尝试多种跳转方式

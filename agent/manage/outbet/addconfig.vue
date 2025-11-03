@@ -342,7 +342,7 @@ export default {
   mixins: [uni.$mymixin],
   data() {
     return {
-      backUrl: "agent/manage/outbet/outbetlist",
+      backUrl: "agent/manage/outbet/outbetlist", // 默认返回地址
       isEdit: false, // 是否为编辑模式
       editConfigId: null, // 编辑的配置ID
       formData: {
@@ -440,6 +440,12 @@ export default {
     }
   },
   onLoad(options) {
+    // 接收来源页面作为返回地址
+    if(options.from) {
+      this.backUrl = decodeURIComponent(options.from);
+      console.log('✅ 接收到返回地址:', this.backUrl);
+    }
+    
     // 检查是否为编辑模式 - 优先从URL参数获取，其次从存储获取
     if(options.id) {
       this.editConfigId = options.id;

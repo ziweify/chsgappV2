@@ -10,6 +10,15 @@
     
     <!-- 配置信息展示区域 -->
     <view class="config-info-section">
+      <!-- 弹窗模式下的顶部操作栏 -->
+      <view v-if="isPopupMode" class="popup-header-actions">
+        <text class="popup-title">打单配置管理</text>
+        <view class="add-config-btn" @click="goToAddConfig()">
+          <text class="add-icon">➕</text>
+          <text class="add-text">添加配置</text>
+        </view>
+      </view>
+      
       <view class="config-info-card">
         <view class="config-header-info">
           <view class="config-title">
@@ -106,7 +115,7 @@
       </view>
       
       <!-- 配置项列表 -->
-      <view v-for="(item,index) in list" :key="index" class="config-item">
+      <view v-for="(item,index) in list" :key="index" class="config-item" :class="{'config-disabled': !isOutbetAvailable()}">
         <!-- 配置头部 -->
         <view class="config-header">
           <view class="config-name">
@@ -125,16 +134,17 @@
             <text class="value">{{ item.username }}</text>
           </view>
           <view class="detail-row">
-            <text class="label">在线状态：</text>
+            <text class="label">登录状态：</text>
             <view class="online-status" :class="item.online == 1 ? 'online' : 'offline'">
-              {{ item.online == 1 ? '在线' : '离线' }}
+              {{ item.online == 1 ? '已登录' : '未登录' }}
             </view>
           </view>
-          <view class="detail-row full-width">
+          <view class="detail-row full-width" :class="{'balance-outdated': !isBalanceValid(item)}">
             <text class="label">余额/未结/盈亏：</text>
-            <text class="value account-info">
-              {{ item.balance || '0' }}/{{ item.unsettle || '0' }}/<text :class="getProfitClass(item.sy)">{{ item.sy || '0' }}</text>
+            <text class="value account-info" :class="{'text-muted': !isBalanceValid(item)}">
+              {{ item.balance || '--' }}/{{ item.unsettle || '--' }}/<text :class="getProfitClass(item.sy)">{{ item.sy || '--' }}</text>
             </text>
+            <text v-if="!isBalanceValid(item)" class="data-status-tip">数据未更新</text>
           </view>
           <view class="detail-row" v-if="item.start_money > 0">
             <text class="label">起飞金额：</text>
@@ -158,7 +168,7 @@
         <view class="config-actions">
           <u-button @click="viewConfig(item)" size="mini" type="info" plain>查看</u-button>
           <u-button @click="editConfig(item)" size="mini" type="primary" plain>修改</u-button>
-          <u-button @click="toggleStatus(item)" size="mini" :type="item.enabled == 1 ? 'warning' : 'success'" plain>
+          <u-button @click="toggleStatus(item)" size="mini" :type="item.enabled == 1 ? 'warning' : 'success'" plain :disabled="!isOutbetAvailable()">
             {{ item.enabled == 1 ? '停用' : '启用' }}
           </u-button>
           <u-button @click="deleteConfig(item)" size="mini" type="error" plain>删除</u-button>
@@ -502,8 +512,8 @@ export default {
         // 弹窗模式下触发事件
         this.$emit('addConfig');
       } else {
-        // 页面模式下直接跳转
-        uni.$utils.jump('agent/manage/outbet/addconfig');
+        // 页面模式下直接跳转，传递当前backUrl作为返回地址
+        uni.$utils.jump('agent/manage/outbet/addconfig?from=' + encodeURIComponent(this.backUrl));
       }
     },
 
@@ -535,9 +545,9 @@ export default {
           console.log('🔧 弹窗模式下触发 editConfig 事件');
           this.$emit('editConfig', item);
         } else {
-          // 页面模式下直接跳转
+          // 页面模式下直接跳转，传递当前backUrl作为返回地址
           console.log('🔧 页面模式下直接跳转');
-          uni.$utils.jump('agent/manage/outbet/addconfig?id=' + item.id);
+          uni.$utils.jump('agent/manage/outbet/addconfig?id=' + item.id + '&from=' + encodeURIComponent(this.backUrl));
         }
         uni.hideLoading();
       }, 300);
@@ -801,11 +811,15 @@ export default {
         // 更新配置列表中对应项目的状态
         const configIndex = this.list.findIndex(item => item.id == updateData.id);
         if (configIndex !== -1) {
+          const oldBalance = this.list[configIndex].balance;
+          const newBalance = updateData.balance || 0;
+          
           console.log('🔄 更新配置状态:', {
             id: updateData.id,
             name: updateData.name,
             enabled: updateData.enabled,
-            balance: updateData.balance
+            balance: newBalance,
+            balanceChanged: oldBalance != newBalance
           });
           
           // 使用Vue的响应式更新
@@ -813,18 +827,18 @@ export default {
             ...this.list[configIndex],
             enabled: updateData.enabled,
             online: updateData.online || 0,
-            balance: updateData.balance || 0,
+            balance: newBalance,
             unsettle: updateData.unsettle || 0,
-            profit_loss: updateData.profit_loss || 0
+            sy: updateData.sy || updateData.profit_loss || 0,
+            bz: updateData.bz || `${newBalance}|${updateData.unsettle || 0}|${updateData.sy || 0}`,
+            balance_update_time: updateData.balance_update_time || Math.floor(Date.now() / 1000)
           });
           
-          // 显示状态更新提示
-          const statusText = updateData.enabled == 1 ? '已启用' : '已停用';
-          uni.showToast({
-            title: `${updateData.name} ${statusText}`,
-            icon: 'success',
-            duration: 1500
-          });
+          // 如果余额有更新，显示提示
+          if (oldBalance != newBalance && newBalance > 0) {
+            console.log('💰 余额数据已更新');
+            // 不显示toast，避免打扰用户，但数据和样式会自动更新
+          }
         }
       }
     },
@@ -844,6 +858,34 @@ export default {
       if (profit > 0) return 'profit-positive';
       if (profit < 0) return 'profit-negative';
       return 'profit-zero';
+    },
+
+    // 判断余额数据是否有效
+    isBalanceValid(item) {
+      // 如果配置未启用，余额数据无效
+      if (item.enabled != 1) {
+        return false;
+      }
+      
+      // 如果有余额更新时间字段，检查是否在5分钟内
+      if (item.balance_update_time) {
+        const now = Math.floor(Date.now() / 1000);
+        const updateTime = item.balance_update_time;
+        // 超过5分钟未更新，视为过期
+        if (now - updateTime > 300) {
+          return false;
+        }
+      }
+      
+      // 如果balance、unsettle、sy都是0或空，且没有bz字段，可能是未查询过
+      if ((!item.balance || item.balance == 0) && 
+          (!item.unsettle || item.unsettle == 0) && 
+          (!item.sy || item.sy == 0) &&
+          !item.bz) {
+        return false;
+      }
+      
+      return true;
     },
 
     // 格式化过期时间
@@ -1055,6 +1097,24 @@ export default {
       } catch (e) {
         return dataStr;
       }
+    },
+    
+    // 判断是否可以操作配置（总开关开启且未过期）
+    isOutbetAvailable() {
+      // 检查总开关是否开启
+      if (this.configInfo.outbet_switch != 1) {
+        return false;
+      }
+      
+      // 检查是否过期
+      if (this.configInfo.outbet_overtime && this.configInfo.outbet_overtime > 0) {
+        const currentTime = Math.floor(Date.now() / 1000);
+        if (currentTime >= this.configInfo.outbet_overtime) {
+          return false; // 已过期
+        }
+      }
+      
+      return true;
     }
   }
 }
@@ -1090,6 +1150,52 @@ export default {
   .popup-mode & {
     padding: 15rpx; // 从20rpx缩小
     flex: 0 0 auto;
+  }
+  
+  // 弹窗模式下的顶部操作栏
+  .popup-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20rpx 20rpx 15rpx;
+    background: #fff;
+    border-radius: 16rpx 16rpx 0 0;
+    margin-bottom: 15rpx;
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+    
+    .popup-title {
+      font-size: 32rpx;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .add-config-btn {
+      display: flex;
+      align-items: center;
+      padding: 10rpx 20rpx;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 30rpx;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4rpx 12rpx rgba(102, 126, 234, 0.3);
+      
+      &:active {
+        transform: scale(0.95);
+        box-shadow: 0 2rpx 8rpx rgba(102, 126, 234, 0.2);
+      }
+      
+      .add-icon {
+        font-size: 28rpx;
+        margin-right: 8rpx;
+        color: #fff;
+      }
+      
+      .add-text {
+        font-size: 26rpx;
+        font-weight: 600;
+        color: #fff;
+      }
+    }
   }
   
   .config-info-card {
@@ -1428,10 +1534,33 @@ export default {
     margin-bottom: 15rpx;
     padding: 15rpx;
     box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
     
     // 确保item能完整显示所有内容
     height: auto;
     overflow: visible;
+    
+    // 总开关关闭或过期时的灰色显示
+    &.config-disabled {
+      background: #f5f5f5;
+      opacity: 0.7;
+      pointer-events: none; // 禁止所有交互（除了查看和修改按钮）
+      
+      .config-header, .config-details {
+        opacity: 0.6;
+      }
+      
+      .config-actions {
+        pointer-events: auto; // 允许按钮区域交互
+        
+        ::v-deep .u-button {
+          &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+          }
+        }
+      }
+    }
     
     .config-header {
       display: flex;
@@ -1500,10 +1629,28 @@ export default {
         align-items: center;
         min-height: 24rpx;
         padding: 2rpx 0;
+        position: relative;
+        transition: all 0.3s ease;
         
         // 让某些行占据整行宽度（如游戏、网址等长文本）
         &.full-width {
           grid-column: 1 / -1;
+          padding: 8rpx;
+          border-radius: 8rpx;
+        }
+        
+        // 余额数据过期/无效时的样式
+        &.balance-outdated {
+          background: #e9ecef;
+          border: 1rpx solid #dee2e6;
+          
+          .label {
+            color: #999;
+          }
+          
+          .value {
+            color: #999;
+          }
         }
         
         .label {
@@ -1520,9 +1667,14 @@ export default {
           flex: 1;
           word-wrap: break-word;
           overflow-wrap: break-word;
+          transition: color 0.3s ease;
           
           &.account-info {
             font-weight: bold;
+          }
+          
+          &.text-muted {
+            color: #999;
           }
           
           &.game-names, &.url-names {
@@ -1531,6 +1683,16 @@ export default {
             word-break: break-all;
             white-space: normal;
           }
+        }
+        
+        .data-status-tip {
+          font-size: 18rpx;
+          color: #ff9800;
+          margin-left: 8rpx;
+          padding: 2rpx 8rpx;
+          background: #fff3e0;
+          border-radius: 6rpx;
+          white-space: nowrap;
         }
         
         .online-status {
