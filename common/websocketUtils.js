@@ -189,12 +189,15 @@ class websocketUtils {
         }
     }
     
-    // 页面可见性监听
+    // 页面可见性监听 - 增强版
     initPageVisibilityListener() {
         if (typeof document !== 'undefined') {
+            let pageHideTime = null;  // 记录页面隐藏时间
+            
             const visibilityChangeHandler = () => {
                 if (document.visibilityState === 'visible') {
-                    console.log('🌞 H5: 页面变为可见，智能检测连接状态');
+                    const hiddenDuration = pageHideTime ? (Date.now() - pageHideTime) : 0;
+                    console.log(`🌞 H5: 页面恢复可见，隐藏时长: ${(hiddenDuration/1000).toFixed(1)}秒`);
                     
                     // ✅ 改进：页面恢复时不立即重连，先检测连接是否真的断开
                     // 给服务器一些时间处理，避免fd冲突
@@ -207,24 +210,63 @@ class websocketUtils {
                             console.log('✅ 连接状态正常，无需重连');
                         }
                     }, 800); // ✅ 延迟800ms，给服务器足够时间清理旧fd
+                    
+                    // 🔔 触发页面恢复回调（供外部使用）
+                    if (this.onPageVisibleCallback) {
+                        try {
+                            this.onPageVisibleCallback({ hiddenDuration });
+                        } catch (error) {
+                            console.error('onPageVisibleCallback 执行出错:', error);
+                        }
+                    }
+                    
+                    pageHideTime = null;
                 } else {
-                    console.log('🌙 H5: 页面变为隐藏，保持连接');
+                    pageHideTime = Date.now();
+                    console.log('🌙 H5: 页面进入后台，保持连接');
                     // ✅ 页面隐藏时不做任何操作，让连接自然保持
+                    
+                    // 🔔 触发页面隐藏回调（供外部使用）
+                    if (this.onPageHiddenCallback) {
+                        try {
+                            this.onPageHiddenCallback();
+                        } catch (error) {
+                            console.error('onPageHiddenCallback 执行出错:', error);
+                        }
+                    }
                 }
             };
             
             // 监听页面可见性变化
             document.addEventListener('visibilitychange', visibilityChangeHandler);
             
-            // ❌ 移除window.focus监听，避免与visibilitychange重复触发
-            // window.addEventListener('focus', () => {
-            //     if (!this.isOpenSocket && !this.isUserClose && this.shouldAutoReconnect) {
-            //         this.debouncedReconnect('window_focus');
-            //     }
-            // });
+            // 额外的 pageshow 事件监听（处理从缓存恢复的情况）
+            window.addEventListener('pageshow', (event) => {
+                if (event.persisted) {
+                    // 页面从 bfcache 恢复
+                    console.log('🔄 页面从缓存恢复 (bfcache)');
+                    setTimeout(() => {
+                        if (!this.isOpenSocket && !this.isUserClose && this.shouldAutoReconnect && !this.isUserExitApp) {
+                            console.log('🔍 缓存恢复后检测到连接断开，准备重连');
+                            this.debouncedReconnect('pageshow_bfcache');
+                        }
+                    }, 1000);
+                }
+            });
             
-            console.log('H5: 页面可见性监听已初始化（优化版），当前状态:', document.visibilityState);
+            console.log('H5: 页面可见性监听已初始化（增强版），当前状态:', document.visibilityState);
         }
+    }
+    
+    /**
+     * 设置页面可见性回调
+     * @param {Function} onVisible - 页面可见时的回调
+     * @param {Function} onHidden - 页面隐藏时的回调
+     */
+    setPageVisibilityCallbacks(onVisible, onHidden) {
+        this.onPageVisibleCallback = onVisible;
+        this.onPageHiddenCallback = onHidden;
+        console.log('✅ 页面可见性回调已设置');
     }
 
     // 初始化应用状态监听

@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>页面可见性修复测试页</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            font-size: 24px;
+            color: #667eea;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .status-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .status-card h3 {
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+        }
+        
+        .status-card h3::before {
+            content: '●';
+            margin-right: 8px;
+            font-size: 20px;
+        }
+        
+        .status-card.success h3::before {
+            color: #28a745;
+        }
+        
+        .status-card.warning h3::before {
+            color: #ffc107;
+        }
+        
+        .status-card.error h3::before {
+            color: #dc3545;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        
+        .status-label {
+            font-weight: 500;
+            color: #666;
+        }
+        
+        .status-value {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .status-value.good {
+            color: #28a745;
+        }
+        
+        .status-value.bad {
+            color: #dc3545;
+        }
+        
+        .timer-display {
+            font-size: 48px;
+            text-align: center;
+            font-weight: 700;
+            color: #667eea;
+            padding: 24px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .log-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 8px;
+            padding: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        
+        .log-entry {
+            margin-bottom: 4px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .log-entry.visible {
+            color: #4ec9b0;
+        }
+        
+        .log-entry.hidden {
+            color: #ce9178;
+        }
+        
+        .log-entry.timer {
+            color: #569cd6;
+        }
+        
+        .log-entry.error {
+            color: #f48771;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+            color: #333;
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: #333;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .instructions {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .instructions h4 {
+            color: #856404;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 4px;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 页面可见性修复测试</h1>
+        
+        <div class="instructions">
+            <h4>📖 测试步骤</h4>
+            <ol>
+                <li>在微信中打开这个页面</li>
+                <li>观察计时器正常运行</li>
+                <li>切换到微信聊天（发送消息）</li>
+                <li>等待 10-30 秒</li>
+                <li>切换回本页面</li>
+                <li>检查计时器是否继续运行</li>
+            </ol>
+        </div>
+        
+        <div class="timer-display" id="timer">00:00:00</div>
+        
+        <div class="status-card success" id="pageStatus">
+            <h3>页面状态</h3>
+            <div class="status-item">
+                <span class="status-label">当前状态</span>
+                <span class="status-value good" id="visibilityStatus">可见</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">隐藏时长</span>
+                <span class="status-value" id="hiddenDuration">0 秒</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">切换次数</span>
+                <span class="status-value" id="switchCount">0 次</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">定时器状态</span>
+                <span class="status-value good" id="timerStatus">运行中</span>
+            </div>
+        </div>
+        
+        <div class="status-card" id="envStatus">
+            <h3>运行环境</h3>
+            <div class="status-item">
+                <span class="status-label">浏览器</span>
+                <span class="status-value" id="browser">检测中...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">是否微信</span>
+                <span class="status-value" id="isWechat">检测中...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">支持 visibilitychange</span>
+                <span class="status-value" id="supportsVisibility">检测中...</span>
+            </div>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-primary" onclick="testManualRefresh()">手动刷新测试</button>
+            <button class="btn-success" onclick="clearLogs()">清空日志</button>
+            <button class="btn-warning" onclick="pauseTimer()">暂停/恢复</button>
+            <button class="btn-danger" onclick="resetTest()">重置测试</button>
+        </div>
+        
+        <div class="status-card">
+            <h3>事件日志</h3>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry">等待事件...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 状态管理
+        const state = {
+            startTime: Date.now(),
+            hideTime: null,
+            switchCount: 0,
+            timerPaused: false,
+            timerInterval: null,
+            logs: []
+        };
+        
+        // 日志函数
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const log = `[${timestamp}] ${message}`;
+            state.logs.push({ log, type });
+            
+            const logContainer = document.getElementById('logContainer');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = log;
+            logContainer.appendChild(logEntry);
+            
+            // 自动滚动到底部
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // 限制日志数量
+            if (state.logs.length > 50) {
+                state.logs.shift();
+                logContainer.removeChild(logContainer.firstChild);
+            }
+            
+            console.log(log);
+        }
+        
+        // 更新计时器显示
+        function updateTimer() {
+            if (state.timerPaused) return;
+            
+            const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+            const hours = Math.floor(elapsed / 3600);
+            const minutes = Math.floor((elapsed % 3600) / 60);
+            const seconds = elapsed % 60;
+            
+            const display = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.getElementById('timer').textContent = display;
+        }
+        
+        // 启动定时器
+        function startTimer() {
+            if (state.timerInterval) {
+                clearInterval(state.timerInterval);
+            }
+            
+            state.timerInterval = setInterval(updateTimer, 100);
+            document.getElementById('timerStatus').textContent = '运行中';
+            document.getElementById('timerStatus').className = 'status-value good';
+            addLog('✅ 定时器已启动', 'timer');
+        }
+        
+        // 检测环境
+        function detectEnvironment() {
+            const ua = navigator.userAgent.toLowerCase();
+            const isWechat = ua.indexOf('micromessenger') !== -1;
+            const supportsVisibility = typeof document.hidden !== 'undefined';
+            
+            // 检测浏览器
+            let browser = 'Unknown';
+            if (isWechat) {
+                browser = '微信内置浏览器';
+            } else if (ua.indexOf('chrome') > -1) {
+                browser = 'Chrome';
+            } else if (ua.indexOf('safari') > -1) {
+                browser = 'Safari';
+            } else if (ua.indexOf('firefox') > -1) {
+                browser = 'Firefox';
+            }
+            
+            document.getElementById('browser').textContent = browser;
+            document.getElementById('isWechat').textContent = isWechat ? '是 ✅' : '否';
+            document.getElementById('isWechat').className = isWechat ? 'status-value good' : 'status-value';
+            document.getElementById('supportsVisibility').textContent = supportsVisibility ? '支持 ✅' : '不支持 ❌';
+            document.getElementById('supportsVisibility').className = supportsVisibility ? 'status-value good' : 'status-value bad';
+            
+            addLog(`🌍 环境检测完成: ${browser}, 微信=${isWechat}, 支持可见性=${supportsVisibility}`, 'info');
+            
+            if (isWechat && supportsVisibility) {
+                document.getElementById('envStatus').classList.add('success');
+                addLog('✅ 环境符合测试要求', 'info');
+            } else if (!supportsVisibility) {
+                document.getElementById('envStatus').classList.add('error');
+                addLog('❌ 当前浏览器不支持 visibilitychange 事件', 'error');
+            }
+        }
+        
+        // 页面可见性变化处理
+        function handleVisibilityChange() {
+            if (document.hidden) {
+                // 页面隐藏
+                state.hideTime = Date.now();
+                state.switchCount++;
+                
+                document.getElementById('visibilityStatus').textContent = '隐藏';
+                document.getElementById('visibilityStatus').className = 'status-value bad';
+                document.getElementById('switchCount').textContent = `${state.switchCount} 次`;
+                document.getElementById('pageStatus').classList.remove('success');
+                document.getElementById('pageStatus').classList.add('warning');
+                
+                addLog('🌙 页面进入后台', 'hidden');
+            } else {
+                // 页面可见
+                const hiddenDuration = state.hideTime ? (Date.now() - state.hideTime) / 1000 : 0;
+                
+                document.getElementById('visibilityStatus').textContent = '可见';
+                document.getElementById('visibilityStatus').className = 'status-value good';
+                document.getElementById('hiddenDuration').textContent = `${hiddenDuration.toFixed(1)} 秒`;
+                document.getElementById('pageStatus').classList.remove('warning');
+                document.getElementById('pageStatus').classList.add('success');
+                
+                addLog(`🌞 页面恢复前台，隐藏时长: ${hiddenDuration.toFixed(1)}秒`, 'visible');
+                
+                // 检查定时器是否还在运行
+                if (!state.timerInterval) {
+                    addLog('⚠️ 检测到定时器丢失，正在重启...', 'warning');
+                    startTimer();
+                } else {
+                    addLog('✅ 定时器正常运行', 'timer');
+                }
+                
+                // 模拟数据刷新
+                addLog('🔄 触发数据刷新...', 'info');
+            }
+        }
+        
+        // 测试函数
+        function testManualRefresh() {
+            addLog('🧪 执行手动刷新测试', 'info');
+            handleVisibilityChange();
+        }
+        
+        function clearLogs() {
+            state.logs = [];
+            document.getElementById('logContainer').innerHTML = '<div class="log-entry">日志已清空</div>';
+            addLog('🧹 日志已清空', 'info');
+        }
+        
+        function pauseTimer() {
+            state.timerPaused = !state.timerPaused;
+            
+            if (state.timerPaused) {
+                document.getElementById('timerStatus').textContent = '已暂停';
+                document.getElementById('timerStatus').className = 'status-value bad';
+                addLog('⏸️ 定时器已暂停', 'warning');
+            } else {
+                document.getElementById('timerStatus').textContent = '运行中';
+                document.getElementById('timerStatus').className = 'status-value good';
+                addLog('▶️ 定时器已恢复', 'timer');
+            }
+        }
+        
+        function resetTest() {
+            state.startTime = Date.now();
+            state.hideTime = null;
+            state.switchCount = 0;
+            state.timerPaused = false;
+            
+            document.getElementById('switchCount').textContent = '0 次';
+            document.getElementById('hiddenDuration').textContent = '0 秒';
+            
+            clearLogs();
+            addLog('🔄 测试已重置', 'info');
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            addLog('🚀 页面加载完成', 'info');
+            detectEnvironment();
+            startTimer();
+            
+            // 监听页面可见性变化
+            if (typeof document.hidden !== 'undefined') {
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                addLog('👂 已注册 visibilitychange 监听器', 'info');
+            } else {
+                addLog('❌ 浏览器不支持 visibilitychange', 'error');
+            }
+            
+            // 监听 pageshow 事件（处理 bfcache）
+            window.addEventListener('pageshow', function(event) {
+                if (event.persisted) {
+                    addLog('🔄 页面从缓存恢复 (bfcache)', 'visible');
+                    if (!state.timerInterval) {
+                        addLog('⚠️ 缓存恢复后定时器丢失，正在重启...', 'warning');
+                        startTimer();
+                    }
+                }
+            });
+            
+            // 监听 focus/blur
+            window.addEventListener('focus', function() {
+                addLog('👁️ 窗口获得焦点', 'visible');
+            });
+            
+            window.addEventListener('blur', function() {
+                addLog('👁️‍🗨️ 窗口失去焦点', 'hidden');
+            });
+            
+            addLog('✅ 所有监听器已注册，开始测试', 'info');
+        });
+        
+        // 防止页面被缓存时出问题
+        window.addEventListener('pagehide', function() {
+            addLog('👋 页面即将隐藏 (pagehide)', 'hidden');
+        });
+    </script>
+</body>
+</html>
+

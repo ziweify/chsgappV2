@@ -10,10 +10,47 @@
 
     },
     onHide() {
-      console.log('app onHide');
+      console.log('📱 App onHide - 应用进入后台');
+      // 记录进入后台的时间
+      this.globalData.appHideTime = Date.now();
+      
+      // 触发可见性管理器的隐藏事件（非H5环境）
+      // #ifndef H5
+      if (uni.$visibilityManager) {
+        uni.$visibilityManager.handleVisibilityChange(false, 'app_hide');
+      }
+      // #endif
     },
     onShow() {
-      console.log('app onShow');
+      const hideTime = this.globalData.appHideTime;
+      const hiddenDuration = hideTime ? Date.now() - hideTime : 0;
+      console.log(`📱 App onShow - 应用恢复前台，后台时长: ${(hiddenDuration/1000).toFixed(1)}秒`);
+      
+      // 触发可见性管理器的显示事件（非H5环境）
+      // #ifndef H5
+      if (uni.$visibilityManager) {
+        uni.$visibilityManager.handleVisibilityChange(true, 'app_show');
+      }
+      // #endif
+      
+      // 刷新站点配置
+      this.getSiteConfig();
+      
+      // 如果后台时间超过 5 秒，执行额外的恢复操作
+      if (hiddenDuration > 5000) {
+        console.log('⚡ 后台时间较长，执行深度恢复');
+        
+        // 1. 检查 WebSocket 连接状态
+        if (uni.$socketUtils && !uni.$socketUtils.isOpenSocket && !uni.$socketUtils.isUserClose) {
+          console.log('🔄 检测到 WebSocket 断开，尝试重连');
+          setTimeout(() => {
+            uni.$socketUtils.debouncedReconnect('app_show_deep_recovery', true);
+          }, 800);
+        }
+        
+        // 2. 触发全局事件，通知各页面刷新数据
+        uni.$emit('app_resumed_from_background', { hiddenDuration });
+      }
     },
 		onLaunch() {
       this.getSiteConfig();

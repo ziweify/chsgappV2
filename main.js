@@ -3,6 +3,7 @@ import App from './App';
 import store from '@/store';
 import uView from '@/uni_modules/uview-ui';
 import websocketUtils from '@/common/websocketUtils.js';
+import VisibilityManager from '@/common/visibilityManager.js';
 // import performanceMonitor from '@/common/performanceMonitor.js';
 import mymixin from '@/libs/mixin/mixin';
 
@@ -11,6 +12,32 @@ import mymixin from '@/libs/mixin/mixin';
 
 // 初始化WebSocket工具
 uni.$socketUtils = new websocketUtils();
+
+// 初始化页面可见性管理器
+uni.$visibilityManager = new VisibilityManager();
+
+// 将 WebSocket 与可见性管理器关联
+// 页面恢复可见时，检查并重连 WebSocket
+uni.$visibilityManager.addListener('visible', (data) => {
+    console.log('📱 全局：页面恢复可见', data);
+    
+    // 页面恢复时，检查 WebSocket 连接状态
+    if (!uni.$socketUtils.isOpenSocket) {
+        console.log('🔄 全局：检测到 WebSocket 未连接，尝试重连');
+        // 给一些时间让页面完全恢复
+        setTimeout(() => {
+            if (!uni.$socketUtils.isOpenSocket && !uni.$socketUtils.isUserClose) {
+                uni.$socketUtils.debouncedReconnect('visibility_manager_visible', true);
+            }
+        }, 500);
+    }
+}, { priority: 100 }); // 高优先级，优先执行
+
+// 页面隐藏时的处理
+uni.$visibilityManager.addListener('hidden', (data) => {
+    console.log('📱 全局：页面进入后台', data);
+    // 页面隐藏时保持 WebSocket 连接，不做额外操作
+});
 
 Vue.config.productionTip = false;
 Vue.use(uView);
