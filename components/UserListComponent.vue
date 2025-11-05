@@ -748,7 +748,7 @@ export default {
       this.$u.api.agent.shangxiafen({
         userid: this.ctiem.userid,
         type: this.shangxiafenType,
-        money: this.cmoney
+        kmoney: this.cmoney  // 修复：改为 kmoney 与后端参数名一致
       }).then(res => {
         uni.showToast({title: '操作成功', icon: 'success'});
         this.isShangxiafenShow = false;
