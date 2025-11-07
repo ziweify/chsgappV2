@@ -721,7 +721,7 @@ export default {
     // 执行编辑
     doEditUser() {
       this.$u.api.agent.updateAccount({
-        username: this.editData.username,
+        userid: this.ctiem.userid,
         password: this.editData.password,
         name: this.editData.name,
         ignore_outbet: this.editData.ignore_outbet
