@@ -638,7 +638,7 @@ export default {
     // 状态选择
     statusClick(item) {
       this.statusShow = false;
-      this.$u.api.agent.changeUserStatus({
+      this.$u.api.agent.modifyStatus({
         userid: this.ctiem.userid,
         room_status: item.key
       }).then(res => {
