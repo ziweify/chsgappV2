@@ -13,22 +13,22 @@
             <view class="item item1">
               <view class="con1">
                 <view class="text1 span1">积分:</view>
-                <view class="text2 span1">{{ balanceInfo.kmoney }}</view>
+                <view class="text2 span1">{{ Math.floor(balanceInfo.kmoney) }}</view>
               </view>
               <view class="con1">
                 <view class="text1 span1">输赢:</view>
-                <view class="text2 span1" :class="balanceInfo.sy > 0 ? 'green' : (balanceInfo.sy < 0 ? 'red' : '')">{{ balanceInfo.sy }}</view>
+                <view class="text2 span1" :class="balanceInfo.sy > 0 ? 'green' : (balanceInfo.sy < 0 ? 'red' : '')">{{ Math.floor(balanceInfo.sy) }}</view>
               </view>
             </view>
             <view class="item item2">
               <view class="con1" v-show="roomConfig.showTurnover == 1">
                 <view class="text1 span1">流水:</view>
-                <view class="text2 span1">{{ balanceInfo.jetotal }}</view>
+                <view class="text2 span1">{{ Math.floor(balanceInfo.jetotal) }}</view>
               </view>
               <view class="con1" v-show="roomConfig.showTurnover == 0"><view class="text1 span1"></view><view class="text2 span1"></view></view>
               <view class="con1" v-if="utype == 0 && roomConfig.show_online_count == 0">
                 <view class="text1 span1">回水:</view>
-                <view class="text2 span1">{{ balanceInfo.backWater }}</view>
+                <view class="text2 span1">{{ Math.floor(balanceInfo.backWater) }}</view>
               </view>
               <view class="con1" v-if="utype == 1 || roomConfig.show_online_count == 1">
                 <view class="text1 span1">人数:</view>
@@ -650,11 +650,11 @@
             <view class="h-tr" v-for="(it, index) in msgOrderList" :key="`order-${index}`">
               <view class="h-td"><text class="text">{{ it.b }}</text></view>
               <view class="h-td"><text class="text">{{ it.p }}</text></view>
-              <view class="h-td"><text class="text">{{ it.a }}</text></view>
+              <view class="h-td"><text class="text">{{ Math.floor(it.a) }}</text></view>
               <view class="h-td" v-if="orderShowTtype == 'settle'">
-                <text class="text" v-if="it.y > 0" style="color: green;">+{{ it.y }}</text>
-                <text class="text" v-if="it.y < 0" style="color: red;">{{ it.y }}</text>
-                <text class="text" v-if="it.y == 0">{{ it.y }}</text>
+                <text class="text" v-if="it.y > 0" style="color: green;">+{{ Math.floor(it.y) }}</text>
+                <text class="text" v-if="it.y < 0" style="color: red;">{{ Math.floor(it.y) }}</text>
+                <text class="text" v-if="it.y == 0">{{ Math.floor(it.y) }}</text>
               </view>
             </view>
           </view>
@@ -669,21 +669,21 @@
                   <view class="bet-list-item">
                     <view class="item-up">
                       <text class="strong">第{{ item.period }}期</text>
-                      <text v-if="item.isSettle" class="text" :class="item.winLose > 0 ? 'green' : (item.winLose < 0 ? 'red' : '')">{{ item.winLose > 0 ? "+"+item.winLose : item.winLose }}</text>
+                      <text v-if="item.isSettle" class="text" :class="item.winLose > 0 ? 'green' : (item.winLose < 0 ? 'red' : '')">{{ item.winLose > 0 ? "+"+Math.floor(item.winLose) : Math.floor(item.winLose) }}</text>
                       <text v-if="!item.isSettle" class="text blue">未结算</text>
                     </view>
                     <view class="item-down">
                       <text class="total">注数：{{ item.totalCount }}注</text>
-                      <text class="tmoney">金额：{{ item.totalMoney }}</text>
+                      <text class="tmoney">金额：{{ Math.floor(item.totalMoney) }}</text>
                       <text>收益</text>
                     </view>
                   </view>
                 </template>
                 <view class="bet-detail" v-for="(order, orderIndex) in item.orders" :key="`bet-${index}-${orderIndex}`">
                   <view class="bet-item">
-                    <view class="left">{{ order.playGroupName }}[{{ order.playDetailName }}/{{ order.je }}]</view>
+                    <view class="left">{{ order.playGroupName }}[{{ order.playDetailName }}/{{ Math.floor(order.je) }}]</view>
                     <view class="time">{{ order.time }}</view>
-                    <view v-if="order.isSettle" class="text" :class="order.winLose > 0 ? 'green' : (order.winLose < 0 ? 'red' : '')">{{ order.winLose > 0 ? "+"+order.winLose : order.winLose }}</view>
+                    <view v-if="order.isSettle" class="text" :class="order.winLose > 0 ? 'green' : (order.winLose < 0 ? 'red' : '')">{{ order.winLose > 0 ? "+"+Math.floor(order.winLose) : Math.floor(order.winLose) }}</view>
                     <view v-if="!order.isSettle" class="text blue">未结算</view>
                   </view>
                 </view>
@@ -745,7 +745,7 @@
                 :key="`online-user-${index}`">
                 <view class="online-user-td">{{ user.username }}</view>
                 <view class="online-user-td">{{ user.name }}</view>
-                <view class="online-user-td">{{ user.kmoney }}</view>
+                <view class="online-user-td">{{ Math.floor(user.kmoney) }}</view>
               </view>
             </view>
           </scroll-view>
@@ -2084,7 +2084,15 @@ export default {
     // 获取余额信息
     onGetBalanceInfo(data) {
       this.safeExecute(() => {
-        this.balanceInfo = data.data;
+        // 将金额数据转换为整数显示
+        const balanceData = data.data;
+        if (balanceData) {
+          if (balanceData.kmoney !== undefined) balanceData.kmoney = Math.floor(balanceData.kmoney);
+          if (balanceData.sy !== undefined) balanceData.sy = Math.floor(balanceData.sy);
+          if (balanceData.jetotal !== undefined) balanceData.jetotal = Math.floor(balanceData.jetotal);
+          if (balanceData.backWater !== undefined) balanceData.backWater = Math.floor(balanceData.backWater);
+        }
+        this.balanceInfo = balanceData;
       });
     },
     
@@ -2227,7 +2235,11 @@ export default {
       this.$u.api.agent.getOnlineUserList({gid: this.gid}).then(res => {
         uni.hideLoading();
         if (res.data && Array.isArray(res.data)) {
-          this.onlineUserList = res.data;
+          // 处理在线用户余额为整数
+          this.onlineUserList = res.data.map(user => ({
+            ...user,
+            kmoney: Math.floor(user.kmoney || 0)
+          }));
         } else {
           this.onlineUserList = [];
           uni.showToast({
@@ -3337,7 +3349,13 @@ export default {
         if(res.data.length <= 0){
           this.$u.toast("暂无数据");
         }else{
-          this.periodOrderList = res.data;
+          // 处理注单列表金额为整数
+          const processedData = res.data.map(item => ({
+            ...item,
+            totalMoney: Math.floor(item.totalMoney || 0),
+            winLose: Math.floor(item.winLose || 0)
+          }));
+          this.periodOrderList = processedData;
           this.betRecordShow = !this.betRecordShow;
         }
       }).catch(err => {});
@@ -3347,7 +3365,13 @@ export default {
         uni.showLoading({title: '加载中'});
         let item = this.periodOrderList[index];
         this.$u.api.member.getLotterySettledList({gid:this.gid,period:item.period}).then(res => {
-          this.periodOrderList[index].orders = res.data;
+          // 处理订单详情金额为整数
+          const processedOrders = res.data.map(order => ({
+            ...order,
+            je: Math.floor(order.je || 0),
+            winLose: Math.floor(order.winLose || 0)
+          }));
+          this.periodOrderList[index].orders = processedOrders;
           uni.hideLoading();
         }).catch(err => { uni.hideLoading();});
       }
@@ -3623,7 +3647,16 @@ export default {
     msgOrderDetail(item,orderShowTtype){
       this.orderShowTtype = orderShowTtype;
       this.msgOrderDetailShow = true;
-      this.msgOrderList = item;
+      // 处理订单详情金额为整数
+      if (Array.isArray(item)) {
+        this.msgOrderList = item.map(order => ({
+          ...order,
+          a: Math.floor(order.a || 0),
+          y: Math.floor(order.y || 0)
+        }));
+      } else {
+        this.msgOrderList = item;
+      }
     },
     // ========== 页面显示逻辑 ==========
     

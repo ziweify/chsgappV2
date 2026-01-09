@@ -30,12 +30,12 @@
               <!-- 双余额显示区域 -->
               <view class="balance-container">
                 <view class="balance-item">
-                  <text class="balance-amount">{{ info.balance }}</text>
+                  <text class="balance-amount">{{ Math.floor(info.balance || 0) }}</text>
                   <text class="balance-label">用户余额</text>
                 </view>
                 <view class="balance-separator"></view>
                 <view class="balance-item">
-                  <text class="balance-amount">{{ info.bsb_coin || '0' }}</text>
+                  <text class="balance-amount">{{ Math.floor(info.bsb_coin || 0) }}</text>
                   <text class="balance-label">百胜币</text>
                 </view>
               </view>
@@ -43,19 +43,19 @@
             <view class="section-line"></view>
             <view class="section-div-4">
               <view class="section-div-4-1">
-                <text class="text">{{ info.totalMoney }}</text>
+                <text class="text">{{ Math.floor(info.totalMoney || 0) }}</text>
                 <text>今日流水</text>
               </view>
               <view class="section-div-4-1">
-                <text class="text" :class="info.sy > 0 ? 'm-green' : (info.sy < 0 ? 'm-red' : '')">{{ info.sy }}</text>
+                <text class="text" :class="info.sy > 0 ? 'm-green' : (info.sy < 0 ? 'm-red' : '')">{{ Math.floor(info.sy || 0) }}</text>
                 <text>今日盈亏</text>
               </view>
               <view class="section-div-4-1">
-                <text class="text">{{ info.backWater }}</text>
+                <text class="text">{{ Math.floor(info.backWater || 0) }}</text>
                 <text>今日回水</text>
               </view>
               <view class="section-div-4-1">
-                <text class="text" :class="info.totalSy > 0 ? 'm-green' : (info.totalSy < 0 ? 'm-red' : '')">{{ info.totalSy }}</text>
+                <text class="text" :class="info.totalSy > 0 ? 'm-green' : (info.totalSy < 0 ? 'm-red' : '')">{{ Math.floor(info.totalSy || 0) }}</text>
                 <text>总盈亏</text>
               </view>
             </view>
@@ -141,7 +141,17 @@ export default {
     },
     getCenterInfo(){
       this.$u.api.agent.getCenterInfo({}).then(res => {
-        this.info = res.data;
+        // 处理金额数据为整数
+        const data = res.data;
+        if (data) {
+          if (data.balance !== undefined) data.balance = Math.floor(data.balance);
+          if (data.bsb_coin !== undefined) data.bsb_coin = Math.floor(data.bsb_coin);
+          if (data.totalMoney !== undefined) data.totalMoney = Math.floor(data.totalMoney);
+          if (data.sy !== undefined) data.sy = Math.floor(data.sy);
+          if (data.backWater !== undefined) data.backWater = Math.floor(data.backWater);
+          if (data.totalSy !== undefined) data.totalSy = Math.floor(data.totalSy);
+        }
+        this.info = data;
       });
     },
     getCurrentTime() {

@@ -17,7 +17,7 @@ module.exports = {
     port: 8080,       // 端口号
     disableHostCheck: true,  // 禁用主机检查
     // ✅ 配置自动打开的域名
-    public: 'h5.chsg.com:8080',  // 指定公开访问的地址
+    // public: 'h5.chsg.com:8080',  // 注释掉以使用 localhost
     // 或者使用 open 配置（如果上面不生效）
     // open: true,
     // openPage: 'http://h5.chsg.com:8080/',
