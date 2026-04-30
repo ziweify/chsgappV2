@@ -97,6 +97,7 @@ const install = (Vue, vm) => {
 		updateAccount: (params) => http.post("/agent/center/updateAccount",params),//修改账号
 		generateLink: (params) => http.post("/agent/center/generateLink",params),//生成链接
 		modifyStatus: (params) => http.post("/agent/center/modifyStatus",params),//修改状态
+		deleteUser: (params) => http.post("/agent/center/deleteUser",params),//删除单个会员（保留报表，近7天无注单）
 		delAllZeroUser: () => http.post("/agent/center/delAllZeroUser",{}),//删除0余额用户
 		shangxiafen: (params) => http.post("/agent/center/shangxiafen",params),//上下分
 		getSonAccountList: (params) => http.get("/agent/center/getSonAccountList",{params:params}),//获取子账号列表

@@ -391,7 +391,7 @@ export default {
       },
       sortList: [{title: '默认排序', key: 'id'}, {title: '分数排序', key: 'kmoney'}, {title: '在线排序', key: 'online'}],
       statusList: [{title: '全部', key: '-1'}, {title: '正常', key: '1'}, {title: '停用', key: '0'}, {title: '禁言', key: '2'}],
-      actionList: [{name: '信息', key: 'info'}, {name: '私聊', key: 'chat'}, {name: '修改', key: 'mod'}, {name: '上下分', key: 'km'}, {name: '生成链接', key: 'link'}],
+      actionList: [{name: '信息', key: 'info'}, {name: '私聊', key: 'chat'}, {name: '修改', key: 'mod'}, {name: '上下分', key: 'km'}, {name: '生成链接', key: 'link'}, {name: '删除', key: 'del'}],
       actionShow: false,
       actionTitle: '',
       statusShow: false,
@@ -580,7 +580,36 @@ export default {
         case 'link':
           this.showGenerateLink();
           break;
+        case 'del':
+          this.confirmDeleteUser();
+          break;
       }
+    },
+
+    confirmDeleteUser() {
+      const u = this.ctiem;
+      if (!u || !u.userid) return;
+      uni.showModal({
+        title: '确认删除会员',
+        content: `删除后该账号无法登录；历史报表与资金流水记录仍会保留，不影响已对账数据。\n须同时满足：余额为 0，且最近 7 天内无任何注单。\n\n确定删除「${u.username}」？`,
+        confirmColor: '#ee0a24',
+        success: (res) => {
+          if (!res.confirm) return;
+          uni.showLoading({ title: '处理中', mask: true });
+          this.$u.api.agent.deleteUser({ userid: u.userid }).then(() => {
+            uni.hideLoading();
+            uni.showToast({ title: '删除成功', icon: 'success' });
+            if (this.isPopupMode) {
+              this.loadUserList(true);
+            } else if (this.$refs.paging) {
+              this.$refs.paging.reload();
+            }
+          }).catch((err) => {
+            uni.hideLoading();
+            uni.showToast({ title: err.msg || err.message || '删除失败', icon: 'none' });
+          });
+        }
+      });
     },
     
     // 显示用户信息
