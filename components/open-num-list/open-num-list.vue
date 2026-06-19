@@ -176,10 +176,10 @@ const BINGO_OPENLIST = {
 	FONT_LH: 18,
 	NOBANNER_H: 952,
 	ROW_COUNT: 31,
-	// GD imagettftext 同参数下字形比 CSS font-size 约大 11%，描边+重绘后再放一点
-	FONT_RENDER_SCALE: 1.14,
-	// 实测 size18 时 ascender≈18px，基线距行顶 15px
-	FONT_ASCENDER_RATIO: 1.0
+	// GD2 imagettftext 的 size 是 point；CSS font-size 是 px（96DPI 下 point×96/72）
+	FONT_POINT_TO_PX: 96 / 72,
+	// 描边+重绘后字形在行内略偏上，按 point→px 后的 ascender 比例微调
+	FONT_ASCENDER_RATIO: 0.88
 };
 
 	export default {
@@ -267,6 +267,9 @@ const BINGO_OPENLIST = {
 					minHeight: `calc(100vw * ${tableMinRatio})`
 				};
 			}
+		},
+		mounted() {
+			this.loadBingoFont();
 		},
 		watch: {
 			// 监听list变化，进行数据验证
@@ -402,9 +405,27 @@ const BINGO_OPENLIST = {
 			bingoPxVw(px) {
 				return `calc(100vw * ${px / BINGO_OPENLIST.BG_W})`;
 			},
-			// imagettftext 的 Y 为基线；按 GD 实测 ascender≈字号，并放大 FONT_RENDER_SCALE 对齐 webp
+			loadBingoFont() {
+				if (typeof uni.loadFontFace !== 'function') {
+					return;
+				}
+				const sources = [
+					'url("/static/font/st.ttf")',
+					'url("static/font/st.ttf")'
+				];
+				sources.forEach((source) => {
+					uni.loadFontFace({
+						global: true,
+						family: 'BingoOpenlist',
+						source,
+						success() {},
+						fail() {}
+					});
+				});
+			},
+			// GD2 point → CSS px，再按 imagettftext 基线定位
 			bingoTextStyle(x, fontSize, extraX = 0) {
-				const scaledSize = fontSize * BINGO_OPENLIST.FONT_RENDER_SCALE;
+				const scaledSize = fontSize * BINGO_OPENLIST.FONT_POINT_TO_PX;
 				const topInRow = BINGO_OPENLIST.TEXT_BASELINE - scaledSize * BINGO_OPENLIST.FONT_ASCENDER_RATIO;
 				return {
 					left: this.bingoPxVw(x + extraX),
@@ -602,9 +623,12 @@ const BINGO_OPENLIST = {
 <style lang="scss" scoped>
 @font-face {
   font-family: 'BingoOpenlist';
-  src: url('~@/static/font/st.ttf') format('truetype');
+  src: url('~@/static/font/st.ttf') format('truetype'),
+    url('/static/font/st.ttf') format('truetype'),
+    url('../../static/font/st.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 
 // 公共变量定义
@@ -902,6 +926,8 @@ $white-color: #fff;
     background-size: 100% auto;
     background-color: #fff;
     box-sizing: border-box;
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
   }
 
   .bingo-image-row {
@@ -918,65 +944,25 @@ $white-color: #fff;
     font-weight: 700;
     line-height: 1;
     white-space: nowrap;
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 
     &.red {
       color: #dc1414;
-      text-shadow:
-        -1px -1px 0 #fff,
-        1px -1px 0 #fff,
-        -1px 1px 0 #fff,
-        1px 1px 0 #fff,
-        0 -1px 0 #fff,
-        0 1px 0 #fff,
-        -1px 0 0 #fff,
-        1px 0 0 #fff,
-        1px 0 0 #dc1414,
-        0 1px 0 #dc1414;
     }
 
     &.black {
       color: #000;
-      text-shadow:
-        -1px -1px 0 #fff,
-        1px -1px 0 #fff,
-        -1px 1px 0 #fff,
-        1px 1px 0 #fff,
-        0 -1px 0 #fff,
-        0 1px 0 #fff,
-        -1px 0 0 #fff,
-        1px 0 0 #fff,
-        1px 0 0 #000,
-        0 1px 0 #000;
     }
 
     &.gray {
       color: #808080;
-      text-shadow:
-        -1px -1px 0 #fff,
-        1px -1px 0 #fff,
-        -1px 1px 0 #fff,
-        1px 1px 0 #fff,
-        0 -1px 0 #fff,
-        0 1px 0 #fff,
-        -1px 0 0 #fff,
-        1px 0 0 #fff,
-        1px 0 0 #808080,
-        0 1px 0 #808080;
     }
 
     &.green {
       color: #28a745;
-      text-shadow:
-        -1px -1px 0 #fff,
-        1px -1px 0 #fff,
-        -1px 1px 0 #fff,
-        1px 1px 0 #fff,
-        0 -1px 0 #fff,
-        0 1px 0 #fff,
-        -1px 0 0 #fff,
-        1px 0 0 #fff,
-        1px 0 0 #28a745,
-        0 1px 0 #28a745;
     }
   }
 
