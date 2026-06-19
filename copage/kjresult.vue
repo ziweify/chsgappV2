@@ -1,7 +1,7 @@
 <template>
-  <view class="layout skin_blue">
+  <view class="layout skin_blue" :class="{'layout-bingo-group': isBingoGroupStyle}">
     <!-- 这里就很整洁了，只要设置ref，绑定query事件，绑定list就可以了 -->
-    <z-paging ref="paging" v-model="list" @query="getResultByDate" :default-page-size="20">
+    <z-paging ref="paging" v-model="list" @query="getResultByDate" :default-page-size="20" :paging-style="isBingoGroupStyle ? pagingGroupStyle : {}">
       <!-- 需要固定在顶部不滚动的view放在slot="top"的view中，如果需要跟着滚动，则不要设置slot="top" -->
       <template #top>
         <view class="t-head">
@@ -22,7 +22,7 @@
               </view>
             </view>
           </view>
-          <view class="t-table-header">
+          <view class="t-table-header" v-if="!isBingoGroupStyle">
             <view class="t-table-header__th">期数/时间</view>
             <view class="t-table-header__th van-tag-box">
               <view v-for="(item,index) in curTabList" :key="index" class="van-tag van-tag--default" @click="sel(index)" :class="{'van-tag--primary':tclass == index}">{{ item }}</view>
@@ -30,8 +30,18 @@
           </view>
         </view>
       </template>
-      <!-- 如果希望其他view跟着页面滚动，可以放在z-paging标签内 -->
-      <view class="t-table">
+      <!-- 群样式：复用聊天室下拉 open-num-list，全宽铺满 -->
+      <view v-if="isBingoGroupStyle" class="kjresult-group-wrap">
+        <open-num-list
+          pageMode
+          :isShow="true"
+          template="BINGO"
+          :list="list"
+          :historyStyle="1"
+          :maxItems="10000"
+        />
+      </view>
+      <view v-else class="t-table">
         <view v-for="(item,index) in list" class="t-table-body__tr" :key="index">
           <view class="t-table-body__td period van-hairline--bottom">
             {{ item.period }}<br>
@@ -132,6 +142,7 @@ import {siteConfig} from "../libs/mixin/mixin";
 export default {
   data() {
     return {
+      openHistoryStyle: 0,
       tclass: 0,
       showcalendar: false,
       show: false,
@@ -159,8 +170,24 @@ export default {
   onLoad(){
     this.backUrl = uni.getStorageSync('backUrl');
     this.query.gid = uni.getStorageSync('cgid');
+    const cachedStyle = uni.getStorageSync('kjresultHistoryStyle');
+    if (cachedStyle !== '' && cachedStyle !== null && cachedStyle !== undefined) {
+      this.openHistoryStyle = cachedStyle;
+    }
     this.top1 = uni.$utils.getDivicePx(this,94);
+    this.loadRoomConfig();
     this.loadGameList(1);
+  },
+  computed: {
+    isBingoGroupStyle() {
+      return this.template === 'BINGO' && (this.openHistoryStyle == 1 || this.openHistoryStyle === '1');
+    },
+    pagingGroupStyle() {
+      return {
+        width: '100%',
+        background: '#fff'
+      };
+    }
   },
   methods: {
     siteConfig() {
@@ -174,14 +201,33 @@ export default {
       param.page = pageNo;
       param.pageSize = pageSize || 20; // 确保每页20条数据
       this.$u.api.common.resultByDate(param).then(res => {
-        // 将请求的结果数组传递给z-paging
-        this.$refs.paging.complete(res.data.records);
+        const records = res.data.records || [];
+        const total = res.data.total || records.length;
+        if (this.$refs.paging.completeByTotal) {
+          this.$refs.paging.completeByTotal(records, total);
+        } else {
+          this.$refs.paging.complete(records);
+        }
       }).catch(res => {
         // 如果请求失败写this.$refs.paging.complete(false);
         // 注意，每次都需要在catch中写这句话很麻烦，z-paging提供了方案可以全局统一处理
         // 在底层的网络请求抛出异常时，写uni.$emit('z-paging-error-emit');即可
         this.$refs.paging.complete(false);
       })
+    },
+    loadRoomConfig() {
+      const prevStyle = this.openHistoryStyle;
+      this.$u.api.common.getRoomConfig().then(res => {
+        if (res.data && res.data.openHistoryStyle !== undefined) {
+          this.openHistoryStyle = res.data.openHistoryStyle;
+          uni.setStorageSync('kjresultHistoryStyle', res.data.openHistoryStyle);
+          if (prevStyle != this.openHistoryStyle && this.$refs.paging) {
+            this.$nextTick(() => {
+              this.$refs.paging.reload(true);
+            });
+          }
+        }
+      }).catch(() => {});
     },
     gclass(name,type = 1) {
       let r = '';
@@ -283,6 +329,32 @@ export default {
   height:100%;
   display: flex;
   flex-direction: column;
+}
+
+.layout.layout-bingo-group {
+  background-color: #fff;
+
+  ::v-deep .zp-paging-container-content,
+  ::v-deep .zp-paging-container,
+  ::v-deep .zp-paging-main,
+  ::v-deep .zp-paging-touch-view,
+  ::v-deep .zp-scroll-view-container,
+  ::v-deep .zp-scroll-view {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  ::v-deep .zp-paging-container-content {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+.kjresult-group-wrap {
+  width: 100%;
+  flex: 1;
+  background: #fff;
+  box-sizing: border-box;
 }
 .right-icon{
   display: flex;

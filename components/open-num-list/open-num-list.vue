@@ -1,5 +1,5 @@
 <template>
-  <view :class="[template.toLowerCase(), {'bingo-group-mode': isBingoGroupStyle}]" class="open-num-list" v-if="isShow">
+  <view :class="[template.toLowerCase(), {'bingo-group-mode': isBingoGroupStyle, 'bingo-group-page-mode': pageMode && isBingoGroupStyle}]" class="open-num-list" v-if="isShow">
     <view class="open-num-item" v-if="!isBingoGroupStyle">
       <view class="period span1">期数</view>
       <view class="drop-down-opened">
@@ -86,8 +86,8 @@
       <!-- BINGO模板：群样式（与群聊开奖图片一致） -->
       <template v-if="isBingoGroupStyle">
         <view class="bingo-image-panel">
-          <scroll-view scroll-y class="bingo-image-scroll">
-            <view v-if="showBingoImage && resolvedOpenListImageUrl" class="bingo-openlist-image-wrap">
+          <component :is="pageMode ? 'view' : 'scroll-view'" :scroll-y="!pageMode" class="bingo-image-scroll" :class="{'bingo-image-scroll-page': pageMode}">
+            <view v-if="shouldShowBingoImage" class="bingo-openlist-image-wrap">
               <image
                 class="bingo-openlist-image"
                 :src="resolvedOpenListImageUrl"
@@ -95,40 +95,27 @@
                 @error="onBingoImageError"
               />
             </view>
-            <view v-else class="bingo-openlist-table">
+            <view v-else class="bingo-openlist-table" :class="{'bingo-openlist-table-page': pageMode}" :style="bingoTableStyle">
               <view
                 class="bingo-image-row"
-                v-for="item in bingoImageList"
+                v-for="(item, rowIndex) in bingoImageList"
                 :key="generateKey(item)"
+                :style="getBingoRowStyle(rowIndex)"
               >
-                <view class="col-period">{{ getBingoPeriodDisplay(item) }}</view>
-                <view class="col-time">{{ item.shortOpenTime || '--:--' }}</view>
-                <view class="col-balls">
-                  <view
-                    class="ball-cell"
-                    v-for="(num, ballIndex) in item.openNum"
-                    :key="generateKey(item, ballIndex)"
-                  >
-                    <text :class="getBingoNumClass(num)">{{ num }}</text>
-                    <text :class="getBingoBigSmallClass(item.property.bigSmalls && item.property.bigSmalls[ballIndex])">
-                      {{ (item.property.bigSmalls && item.property.bigSmalls[ballIndex]) || '-' }}
-                    </text>
-                    <text :class="getBingoSingleDoubleClass(item.property.singleDoubles && item.property.singleDoubles[ballIndex])">
-                      {{ (item.property.singleDoubles && item.property.singleDoubles[ballIndex]) || '-' }}
-                    </text>
-                  </view>
-                </view>
-                <view class="col-sum">
-                  <text class="red">{{ item.property.sum }}</text>
-                  <text :class="getBingoBigSmallClass(item.property.sumBigSmall)">{{ item.property.sumBigSmall }}</text>
-                  <text :class="getBingoSingleDoubleClass(item.property.sumSingleDouble)">{{ item.property.sumSingleDouble }}</text>
-                </view>
-                <view class="col-lh">
-                  <text :class="getBingoDragonTigerClass(item.property.dragonTigerNum)">{{ item.property.dragonTigerNum }}</text>
-                </view>
+                <text class="bingo-cell" :style="bingoTextStyle(BINGO_OPENLIST.PERIOD_X, BINGO_OPENLIST.FONT_PERIOD)" :class="getBingoPeriodClass(item)">{{ getBingoPeriodDisplay(item) }}</text>
+                <text class="bingo-cell" :style="bingoTextStyle(BINGO_OPENLIST.TIME_X, BINGO_OPENLIST.FONT_TIME)" :class="getBingoTimeClass(item)">{{ getBingoTimeDisplay(item) }}</text>
+                <block v-for="(num, ballIndex) in getBingoBallList(item)" :key="generateKey(item, ballIndex)">
+                  <text class="bingo-cell" :style="bingoBallNumStyle(ballIndex, num)" :class="getBingoNumClass(num)">{{ formatBingoBallNum(num) }}</text>
+                  <text class="bingo-cell" :style="bingoBallDxStyle(ballIndex)" :class="getBingoBigSmallClass(getBingoBallBigSmall(item, ballIndex))">{{ getBingoBallBigSmall(item, ballIndex) }}</text>
+                  <text class="bingo-cell" :style="bingoBallDsStyle(ballIndex)" :class="getBingoSingleDoubleClass(getBingoBallSingleDouble(item, ballIndex))">{{ getBingoBallSingleDouble(item, ballIndex) }}</text>
+                </block>
+                <text class="bingo-cell" :style="bingoSumNumStyle(item.property.sum)" :class="getBingoBigSmallClass(item.property.sumBigSmall)">{{ item.property.sum }}</text>
+                <text class="bingo-cell" :style="bingoSumDxStyle()" :class="getBingoBigSmallClass(item.property.sumBigSmall)">{{ item.property.sumBigSmall }}</text>
+                <text class="bingo-cell" :style="bingoSumDsStyle()" :class="getBingoSingleDoubleClass(item.property.sumSingleDouble)">{{ item.property.sumSingleDouble }}</text>
+                <text class="bingo-cell" :style="bingoLhStyle()" :class="getBingoDragonTigerClass(item.property.dragonTigerNum)">{{ item.property.dragonTigerNum }}</text>
               </view>
             </view>
-          </scroll-view>
+          </component>
         </view>
       </template>
 
@@ -155,18 +142,52 @@
         </view>
       </template>
     </view>
-    <view class="btns">
+    <view class="btns" v-if="!pageMode">
       <button @click="tokjresult">查看更多</button>
     </view>
   </view>
 </template>
 
 <script>
+// 与 BuilderResultImage::buildTwbgOpenListImg 一致的绘制参数（786px 宽画布）
+const BINGO_OPENLIST = {
+	BG_W: 786,
+	BANNER_H: 48,
+	START_Y: 77,
+	ROW_H: 28,
+	TEXT_BASELINE: 15,
+	PERIOD_X: 5,
+	TIME_X: 59,
+	BALL_START_X: 94,
+	BALL_CELL_W: 102,
+	BALL_NUM_X: 33,
+	BALL_NUM_NNN: 6,
+	BALL_DX_X: 69,
+	BALL_DS_X: 102,
+	TOTAL_X: 635,
+	TOTAL_SUM_NNN: 5,
+	TOTAL_DX_X: 48,
+	TOTAL_DS_X: 81,
+	LH_X: 751,
+	FONT_PERIOD: 18,
+	FONT_TIME: 16,
+	FONT_NUM: 18,
+	FONT_DXDS: 17,
+	FONT_LH: 18,
+	NOBANNER_H: 952,
+	ROW_COUNT: 31,
+	// GD imagettftext 同参数下字形比 CSS font-size 约大 11%，描边+重绘后再放一点
+	FONT_RENDER_SCALE: 1.14,
+	// 实测 size18 时 ascender≈18px，基线距行顶 15px
+	FONT_ASCENDER_RATIO: 1.0
+};
+
 	export default {
 		name: 'open-num-list',
 		data() {
 			return {
-				showBingoImage: true
+				showBingoImage: true,
+				BINGO_OPENLIST
 			};
 		},
 		computed: {
@@ -194,14 +215,15 @@
 				if (!Array.isArray(this.list)) {
 					return [];
 				}
+				const limit = this.pageMode ? this.maxItems : Math.min(this.maxItems, 50);
 				return this.list.filter(item => {
-					return item && 
-						   (item.shortPeriod || item.id) && 
-						   item.openNum && 
+					return item &&
+						   (item.shortPeriod || item.period || item.id) &&
+						   item.openNum &&
 						   Array.isArray(item.openNum) &&
 						   item.property &&
 						   typeof item.property === 'object';
-				}).slice(0, 50); // 限制最大显示数量，提高性能
+				}).slice(0, limit);
 			},
 			// 判断是否有有效数据
 			hasData() {
@@ -219,9 +241,31 @@
 			resolvedOpenListImageUrl() {
 				return this.openListImageUrl || '';
 			},
+			// 查看更多页用 HTML 表格 + 分页数据铺满整页；聊天下拉仍用 webp 图
+			shouldShowBingoImage() {
+				if (this.pageMode) {
+					return false;
+				}
+				return !this.forceTable && this.showBingoImage && !!this.resolvedOpenListImageUrl;
+			},
 			bingoImageList() {
-				const rows = this.formattedList.slice(0, 31);
+				const rows = this.pageMode ? this.formattedList : this.formattedList.slice(0, 31);
 				return rows.slice().reverse();
+			},
+			// 背景图 openlist-nobanner.png 786×952；行位置按服务端 startY=77、rowHeight=28 换算
+			bingoTableStyle() {
+				const { BG_W, START_Y, BANNER_H, ROW_H, NOBANNER_H } = BINGO_OPENLIST;
+				const rowCount = Math.max(this.bingoImageList.length, 1);
+				const tableTop = START_Y - BANNER_H;
+				const contentH = tableTop + ROW_H * rowCount;
+				const bgRatio = NOBANNER_H / BG_W;
+				const contentRatio = contentH / BG_W;
+				const tableMinRatio = this.pageMode
+					? Math.max(bgRatio, contentRatio)
+					: Math.max(bgRatio, Math.min(contentRatio, (tableTop + ROW_H * BINGO_OPENLIST.ROW_COUNT) / BG_W));
+				return {
+					minHeight: `calc(100vw * ${tableMinRatio})`
+				};
 			}
 		},
 		watch: {
@@ -279,8 +323,18 @@
 				type: Number,
 				default: 50,
 				validator(value) {
-					return value > 0 && value <= 100;
+					return value > 0 && value <= 10000;
 				}
+			},
+			// 开奖结果页模式：隐藏「查看更多」、由外层 z-paging 滚动分页
+			pageMode: {
+				type: Boolean,
+				default: false
+			},
+			// 强制使用 HTML 表格（分页页不使用单张图片）
+			forceTable: {
+				type: Boolean,
+				default: false
 			},
 			// 宾果开奖列表图片地址（与群聊发送的开奖图一致）
 			openListImageUrl: {
@@ -299,9 +353,10 @@
 				this.$emit('finish');
 			},
 			// 跳转到开奖结果详情页
-			tokjresult() {
+            tokjresult() {
 				try {
 					uni.setStorageSync('backUrl', 'copage/chat');
+					uni.setStorageSync('kjresultHistoryStyle', this.historyStyle);
 					uni.$utils.jump("copage/kjresult");
 				} catch (error) {
 					uni.showToast({
@@ -344,6 +399,87 @@
 				const period = item.period || item.shortPeriod || '';
 				return String(period).slice(-3);
 			},
+			bingoPxVw(px) {
+				return `calc(100vw * ${px / BINGO_OPENLIST.BG_W})`;
+			},
+			// imagettftext 的 Y 为基线；按 GD 实测 ascender≈字号，并放大 FONT_RENDER_SCALE 对齐 webp
+			bingoTextStyle(x, fontSize, extraX = 0) {
+				const scaledSize = fontSize * BINGO_OPENLIST.FONT_RENDER_SCALE;
+				const topInRow = BINGO_OPENLIST.TEXT_BASELINE - scaledSize * BINGO_OPENLIST.FONT_ASCENDER_RATIO;
+				return {
+					left: this.bingoPxVw(x + extraX),
+					top: this.bingoPxVw(topInRow),
+					fontSize: this.bingoPxVw(scaledSize)
+				};
+			},
+			getBingoRowStyle(rowIndex) {
+				const top = (BINGO_OPENLIST.START_Y - BINGO_OPENLIST.BANNER_H) + BINGO_OPENLIST.ROW_H * rowIndex;
+				return {
+					top: this.bingoPxVw(top),
+					height: this.bingoPxVw(BINGO_OPENLIST.ROW_H)
+				};
+			},
+			bingoBallNumStyle(ballIndex, num) {
+				const x = BINGO_OPENLIST.BALL_START_X + ballIndex * BINGO_OPENLIST.BALL_CELL_W;
+				const nnn = parseInt(num, 10) < 10 ? BINGO_OPENLIST.BALL_NUM_NNN : 0;
+				return this.bingoTextStyle(x + BINGO_OPENLIST.BALL_NUM_X, BINGO_OPENLIST.FONT_NUM, nnn);
+			},
+			bingoBallDxStyle(ballIndex) {
+				const x = BINGO_OPENLIST.BALL_START_X + ballIndex * BINGO_OPENLIST.BALL_CELL_W;
+				return this.bingoTextStyle(x + BINGO_OPENLIST.BALL_DX_X, BINGO_OPENLIST.FONT_DXDS);
+			},
+			bingoBallDsStyle(ballIndex) {
+				const x = BINGO_OPENLIST.BALL_START_X + ballIndex * BINGO_OPENLIST.BALL_CELL_W;
+				return this.bingoTextStyle(x + BINGO_OPENLIST.BALL_DS_X, BINGO_OPENLIST.FONT_DXDS);
+			},
+			bingoSumNumStyle(sum) {
+				const nnn = parseInt(sum, 10) < 100 ? BINGO_OPENLIST.TOTAL_SUM_NNN : 0;
+				return this.bingoTextStyle(BINGO_OPENLIST.TOTAL_X, BINGO_OPENLIST.FONT_DXDS, nnn);
+			},
+			bingoSumDxStyle() {
+				return this.bingoTextStyle(BINGO_OPENLIST.TOTAL_X + BINGO_OPENLIST.TOTAL_DX_X, BINGO_OPENLIST.FONT_DXDS);
+			},
+			bingoSumDsStyle() {
+				return this.bingoTextStyle(BINGO_OPENLIST.TOTAL_X + BINGO_OPENLIST.TOTAL_DS_X, BINGO_OPENLIST.FONT_DXDS);
+			},
+			bingoLhStyle() {
+				return this.bingoTextStyle(BINGO_OPENLIST.LH_X, BINGO_OPENLIST.FONT_LH);
+			},
+			getBingoTimeDisplay(item) {
+				if (item.shortOpenTime) {
+					return item.shortOpenTime;
+				}
+				if (item.openTime) {
+					const parts = String(item.openTime).split(' ');
+					if (parts[1]) {
+						return parts[1].slice(0, 5);
+					}
+				}
+				return '--:--';
+			},
+			getBingoBallList(item) {
+				const nums = Array.isArray(item.openNum) ? item.openNum.slice(0, 5) : [];
+				while (nums.length < 5) {
+					nums.push(0);
+				}
+				return nums;
+			},
+			formatBingoBallNum(num) {
+				const value = parseInt(num, 10);
+				return value > 0 ? value : '-';
+			},
+			getBingoBallBigSmall(item, ballIndex) {
+				return (item.property.bigSmalls && item.property.bigSmalls[ballIndex]) || '-';
+			},
+			getBingoBallSingleDouble(item, ballIndex) {
+				return (item.property.singleDoubles && item.property.singleDoubles[ballIndex]) || '-';
+			},
+			getBingoPeriodClass(item) {
+				return item.isOpened === false ? 'gray' : 'black';
+			},
+			getBingoTimeClass(item) {
+				return item.isOpened === false ? 'gray' : 'black';
+			},
 			getBingoNumClass(num) {
 				const value = parseInt(num, 10);
 				if (Number.isNaN(value)) return 'black';
@@ -355,7 +491,7 @@
 			// 生成唯一key
 			generateKey(item, suffix = '') {
 				try {
-					const baseKey = item.shortPeriod || item.id || `item_${Math.random().toString(36).substr(2, 9)}`;
+					const baseKey = item.shortPeriod || item.period || item.id || `item_${Math.random().toString(36).substr(2, 9)}`;
 					return suffix ? `${baseKey}-${suffix}` : baseKey;
 				} catch (error) {
 					console.warn('[open-num-list] 生成key失败:', error);
@@ -378,8 +514,8 @@
 						return;
 					}
 					
-					if (!item.shortPeriod && !item.id) {
-						console.warn(`[open-num-list] 第${index}项缺少shortPeriod或id字段`);
+					if (!item.shortPeriod && !item.period && !item.id) {
+						console.warn(`[open-num-list] 第${index}项缺少shortPeriod、period或id字段`);
 						invalidCount++;
 						return;
 					}
@@ -464,6 +600,13 @@
 </script>
 
 <style lang="scss" scoped>
+@font-face {
+  font-family: 'BingoOpenlist';
+  src: url('~@/static/font/st.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 // 公共变量定义
 $border-color: #e6e6e6;
 $text-color: #646464;
@@ -753,103 +896,145 @@ $white-color: #fff;
   }
 
   .bingo-openlist-table {
+    position: relative;
     width: 100%;
     background: url(../../static/img/bg/openlist-nobanner.png) no-repeat top center;
     background-size: 100% auto;
-    padding-top: 3.05%;
-    min-height: 400px;
+    background-color: #fff;
+    box-sizing: border-box;
   }
 
   .bingo-image-row {
-    display: flex;
-    align-items: center;
-    min-height: 28px;
-    height: 2.8vw;
-    padding: 0 0.6%;
+    position: absolute;
+    left: 0;
+    width: 100%;
     box-sizing: border-box;
-    font-size: 2.3vw;
+    overflow: visible;
+  }
+
+  .bingo-cell {
+    position: absolute;
+    font-family: 'BingoOpenlist', 'PingFang SC', 'Microsoft YaHei', sans-serif;
     font-weight: 700;
     line-height: 1;
-    color: #000;
+    white-space: nowrap;
 
-    text {
-      text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
-    }
-
-    .red {
+    &.red {
       color: #dc1414;
+      text-shadow:
+        -1px -1px 0 #fff,
+        1px -1px 0 #fff,
+        -1px 1px 0 #fff,
+        1px 1px 0 #fff,
+        0 -1px 0 #fff,
+        0 1px 0 #fff,
+        -1px 0 0 #fff,
+        1px 0 0 #fff,
+        1px 0 0 #dc1414,
+        0 1px 0 #dc1414;
     }
 
-    .black {
+    &.black {
       color: #000;
+      text-shadow:
+        -1px -1px 0 #fff,
+        1px -1px 0 #fff,
+        -1px 1px 0 #fff,
+        1px 1px 0 #fff,
+        0 -1px 0 #fff,
+        0 1px 0 #fff,
+        -1px 0 0 #fff,
+        1px 0 0 #fff,
+        1px 0 0 #000,
+        0 1px 0 #000;
     }
 
-    .green {
+    &.gray {
+      color: #808080;
+      text-shadow:
+        -1px -1px 0 #fff,
+        1px -1px 0 #fff,
+        -1px 1px 0 #fff,
+        1px 1px 0 #fff,
+        0 -1px 0 #fff,
+        0 1px 0 #fff,
+        -1px 0 0 #fff,
+        1px 0 0 #fff,
+        1px 0 0 #808080,
+        0 1px 0 #808080;
+    }
+
+    &.green {
       color: #28a745;
+      text-shadow:
+        -1px -1px 0 #fff,
+        1px -1px 0 #fff,
+        -1px 1px 0 #fff,
+        1px 1px 0 #fff,
+        0 -1px 0 #fff,
+        0 1px 0 #fff,
+        -1px 0 0 #fff,
+        1px 0 0 #fff,
+        1px 0 0 #28a745,
+        0 1px 0 #28a745;
     }
-  }
-
-  .col-period {
-    width: 7%;
-    text-align: center;
-    flex-shrink: 0;
-  }
-
-  .col-time {
-    width: 7%;
-    text-align: center;
-    flex-shrink: 0;
-    font-size: 2vw;
-  }
-
-  .col-balls {
-    flex: 1;
-    display: flex;
-    justify-content: space-between;
-    padding: 0 1%;
-    min-width: 0;
-  }
-
-  .ball-cell {
-    flex: 1;
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    max-width: 13%;
-
-    text {
-      flex: 1;
-      text-align: center;
-      font-size: 2.15vw;
-    }
-
-    text:first-child {
-      font-size: 2.3vw;
-    }
-  }
-
-  .col-sum {
-    width: 14%;
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    flex-shrink: 0;
-
-    text {
-      font-size: 2.15vw;
-    }
-  }
-
-  .col-lh {
-    width: 8%;
-    text-align: center;
-    flex-shrink: 0;
-    font-size: 2.3vw;
   }
 
   .btns {
     position: relative;
     z-index: 2;
+  }
+
+  &.bingo-group-page-mode {
+    &.open-num-list {
+      width: 100% !important;
+      max-width: 100% !important;
+      max-height: none !important;
+      min-height: 0;
+      margin: 0;
+      padding: 0;
+      border-radius: 0 !important;
+      overflow: visible !important;
+      background: #fff;
+      box-sizing: border-box;
+      flex: 1;
+    }
+
+    .van-pull-refresh,
+    .bingo-image-wrap {
+      width: 100%;
+      flex: 1;
+      overflow: visible;
+    }
+
+    .bingo-image-panel {
+      width: 100%;
+      background: #fff;
+    }
+
+    .bingo-image-scroll-page {
+      max-height: none !important;
+      overflow: visible !important;
+      width: 100%;
+    }
+
+    .bingo-openlist-table-page {
+      width: 100%;
+      background-color: #fff;
+      min-height: calc(100vh - 190px);
+      box-sizing: border-box;
+    }
+
+    .bingo-openlist-table-page .bingo-image-row::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 1px;
+      background: rgba(186, 166, 210, 0.45);
+      pointer-events: none;
+    }
   }
 }
 
@@ -943,7 +1128,7 @@ $white-color: #fff;
 
 // 响应式适配
 @media screen and (max-width: 750rpx) {
-  .open-num-list {
+  .open-num-list:not(.bingo-group-page-mode) {
     max-height: 450rpx;
   }
   
