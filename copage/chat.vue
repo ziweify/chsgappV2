@@ -468,7 +468,7 @@
             </view>
           </view>
         </view>
-        <open-num-list :isShow="isShowOpenList" class="oepnListHeight" :template="template" :list="openresultlist" :openListImageUrl="openListImageUrl"></open-num-list>
+        <open-num-list :isShow="isShowOpenList" class="oepnListHeight" :template="template" :list="openresultlist" :openListImageUrl="openListImageUrl" :historyStyle="roomConfig.openHistoryStyle || 0"></open-num-list>
       </u-transition>
       <u-popup :show="isShowSwitchPannel" mode="right" :closeOnClickOverlay="true" @close="isShowSwitchPannel = !isShowSwitchPannel" :safeAreaInsetTop="true">
         <view>
@@ -839,7 +839,7 @@ export default {
       predictInfoList:[],//预测结果列表
       isshowssckey:false,//是否显示时时彩前三中三等键盘键
       isshowbingokey:false,//是否显示bingo键盘键
-      roomConfig:[],
+      roomConfig:{},
       imgurl:IMAGE_REQUEST_URL,
       msgOrderDetailShow:false,//订单详情弹窗
       msgOrderList:[],//当前要显示的订单列表

@@ -420,7 +420,7 @@
           </view>
         </view>
       </view>
-      <open-num-list :isShow="isShowOpenList" class="oepnListHeight" :template="template" :list="openresultlist"></open-num-list>
+      <open-num-list :isShow="isShowOpenList" class="oepnListHeight" :template="template" :list="openresultlist" :historyStyle="roomConfig.openHistoryStyle || 0"></open-num-list>
     </u-transition>
     <u-popup :show="isShowSwitchPannel" mode="right" :closeOnClickOverlay="true" @close="isShowSwitchPannel = !isShowSwitchPannel" :safeAreaInsetTop="true">
       <view>

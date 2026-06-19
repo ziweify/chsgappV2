@@ -1,6 +1,6 @@
 <template>
-  <view :class="template.toLowerCase()" class="open-num-list" v-if="isShow">
-    <view class="open-num-item" v-if="!isBINGO">
+  <view :class="[template.toLowerCase(), {'bingo-group-mode': isBingoGroupStyle}]" class="open-num-list" v-if="isShow">
+    <view class="open-num-item" v-if="!isBingoGroupStyle">
       <view class="period span1">期数</view>
       <view class="drop-down-opened">
         <view class="scnumList" v-if="isPK10">
@@ -19,7 +19,7 @@
           <view class="gyhe">冠亚和</view>
           <view class="lh">1-5龙虎</view>
         </view>
-        <view class="sscnumList" v-if="isSSC">
+        <view class="sscnumList" v-if="isSSCOrBINGO">
           <view class="numList">
             <view class="span1">一</view>
             <view class="span1">二</view>
@@ -31,7 +31,7 @@
         </view>
       </view>
     </view>
-    <view class="van-pull-refresh" :class="{'bingo-image-wrap': isBINGO}">
+    <view class="van-pull-refresh" :class="{'bingo-image-wrap': isBingoGroupStyle}">
       <!-- PK10模板 -->
       <template v-if="isPK10">
         <view class="open-num-item" v-for="item in formattedList" :key="generateKey(item)">
@@ -83,8 +83,8 @@
         </view>
       </template>
       
-      <!-- BINGO模板：与群聊开奖图片一致的表格样式 -->
-      <template v-if="isBINGO">
+      <!-- BINGO模板：群样式（与群聊开奖图片一致） -->
+      <template v-if="isBingoGroupStyle">
         <view class="bingo-image-panel">
           <scroll-view scroll-y class="bingo-image-scroll">
             <view v-if="showBingoImage && resolvedOpenListImageUrl" class="bingo-openlist-image-wrap">
@@ -131,6 +131,29 @@
           </scroll-view>
         </view>
       </template>
+
+      <!-- BINGO模板：基本样式 -->
+      <template v-if="isBINGO && !isBingoGroupStyle">
+        <view class="open-num-item" v-for="item in formattedList" :key="generateKey(item)">
+          <span class="period">{{ item.shortPeriod }}</span>
+          <view class="drop-down-opened">
+            <view class="open-num min open-num-ul">
+              <view
+                class="drop-down-list-item-ul-li"
+                v-for="(it, itIndex) in item.openNum"
+                :key="generateKey(item, itIndex)"
+                :class="'b'+it"
+              >{{ it }}</view>
+            </view>
+            <view class="sscSum">
+              <view class="red" style="font-weight: bold">{{ item.property.sum }}</view>
+              <view :class="getBigSmallClass(item.property.sumBigSmall)">{{ item.property.sumBigSmall }}</view>
+              <view :class="getSingleDoubleClass(item.property.sumSingleDouble)">{{ item.property.sumSingleDouble }}</view>
+              <view :class="getDragonTigerClass(item.property.dragonTigerNum)">{{ item.property.dragonTigerNum }}</view>
+            </view>
+          </view>
+        </view>
+      </template>
     </view>
     <view class="btns">
       <button @click="tokjresult">查看更多</button>
@@ -158,6 +181,9 @@
 			// 计算当前模板是否为BINGO
 			isBINGO() {
 				return this.template === 'BINGO';
+			},
+			isBingoGroupStyle() {
+				return this.isBINGO && (this.historyStyle == 1 || this.historyStyle === '1');
 			},
 			// 计算当前模板是否为SSC或BINGO（用于表头显示）
 			isSSCOrBINGO() {
@@ -212,7 +238,7 @@
 				this.showBingoImage = true;
 			},
 			isShow(val) {
-				if (val && this.isBINGO) {
+				if (val && this.isBingoGroupStyle) {
 					this.showBingoImage = true;
 				}
 			}
@@ -260,6 +286,11 @@
 			openListImageUrl: {
 				type: String,
 				default: ''
+			},
+			// 开奖历史显示样式 0：基本 1：群样式
+			historyStyle: {
+				type: [Number, String],
+				default: 0
 			}
 		},
 		methods: {
@@ -680,8 +711,8 @@ $white-color: #fff;
   }
 }
 
-// BINGO 特定样式 - 与群聊开奖图片一致的展开面板
-.bingo {
+// BINGO 群样式展开面板
+.bingo.bingo-group-mode {
   &.open-num-list {
     max-height: none;
     background: transparent;

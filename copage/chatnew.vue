@@ -469,7 +469,7 @@
         </view>
         
         <!-- 开奖历史面板 -->
-        <open-num-list :isShow="isShowOpenList" class="oepnListHeight" :template="template" :list="openresultlist"></open-num-list>
+        <open-num-list :isShow="isShowOpenList" class="oepnListHeight" :template="template" :list="openresultlist" :openListImageUrl="openListImageUrl" :historyStyle="roomConfig.openHistoryStyle || 0"></open-num-list>
       </u-transition>
       
       <!-- 游戏切换弹窗 -->
@@ -738,6 +738,26 @@ export default {
     // 优化性能：预计算uid，避免在每个聊天item中重复parseInt
     parsedUid() {
       return parseInt(this.uid);
+    },
+    openListImageUrl() {
+      if (this.template !== 'BINGO' || !this.openImageDomain) {
+        return '';
+      }
+      const list = this.chatList || [];
+      for (let i = list.length - 1; i >= 0; i--) {
+        const item = list[i];
+        if (item.chatType === 'image' && item.content && item.content.indexOf('openlist_') > -1) {
+          return item.content.startsWith('http') ? item.content : (this.openImageDomain + item.content);
+        }
+      }
+      if (this.openResult && this.openResult.period && this.gid) {
+        const now = new Date();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const dstr = `${now.getFullYear()}${month}${day}`;
+        return `${this.openImageDomain}/upload/openimg/${dstr}/${this.gid}/openlist_${this.openResult.period}.webp`;
+      }
+      return '';
     }
   },
   
