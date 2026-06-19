@@ -923,7 +923,9 @@ export default {
   onShow(){
     console.log('🔄 onShow被触发');
     console.log('👁️ 页面显示状态 - UID:', this.uid, 'UType:', this.utype, 'WebSocket状态:', uni.$socketUtils?.isOpenSocket);
-    console.trace('🚨 onShow调用栈:');
+    if (typeof console.trace === 'function') {
+      console.trace('🚨 onShow调用栈');
+    }
     this.initializePageShow();
   },
   onHide(){
@@ -1719,7 +1721,9 @@ export default {
       this.safeExecute(() => {
         console.log('🔌 onWebSocketOpen被调用，参数:', res);
         console.log('👤 用户信息 - ID:', this.uid, '类型:', this.utype, '(0=会员,1=管理员)');
-        console.trace('🚨 onWebSocketOpen调用栈:');
+        if (typeof console.trace === 'function') {
+          console.trace('🚨 onWebSocketOpen调用栈');
+        }
         
         // 防闪烁检查：如果打单中心正在关闭，跳过数据加载
         if (this.isBettingCenterClosing) {
@@ -1752,28 +1756,16 @@ export default {
           return;
         }
         
-        // 重连场景：需要重新加载聊天记录
-        //console.log('🔄 WebSocket重连成功，重新加载聊天记录');
-        
-        // WebSocket重连时，只有在用户在底部时才清空并重新加载聊天记录
-        if (this.isAtBottom) {
-          console.log('🔌 WebSocket重连且用户在底部，清空并重新加载聊天记录');
-          
-          // 清空当前聊天记录
-          this.chatList = [];
-          
-          // 重置分页状态
-          this.hasMoreMessages = true;
-          this.isLoadingMore = false;
-          this.nextLastId = null;
-          this.lastScrollPosition = null;
-          this.unreadCount = 0;
-          
-          this.loadChatRecords(false, false);
-        } else {
-          console.log('🔌 WebSocket重连但用户不在底部，保持当前聊天记录');
-          // 用户在查看历史消息，保持当前数据不变
-        }
+        // 重连场景：始终重新拉取最新消息并滚到底部（与后台恢复/心跳超时后的预期一致）
+        console.log('🔌 WebSocket重连，清空列表并重新加载聊天记录至最新');
+        this.chatList = [];
+        this.hasMoreMessages = true;
+        this.isLoadingMore = false;
+        this.nextLastId = null;
+        this.lastScrollPosition = null;
+        this.unreadCount = 0;
+        this.isAtBottom = true;
+        this.loadChatRecords(false, false);
         
         // 发送其他必要的请求
         // 房主账号延迟并分散发送消息，避免复杂查询同时触发
