@@ -468,7 +468,7 @@
             </view>
           </view>
         </view>
-        <open-num-list :isShow="isShowOpenList" class="oepnListHeight" :template="template" :list="openresultlist"></open-num-list>
+        <open-num-list :isShow="isShowOpenList" class="oepnListHeight" :template="template" :list="openresultlist" :openListImageUrl="openListImageUrl"></open-num-list>
       </u-transition>
       <u-popup :show="isShowSwitchPannel" mode="right" :closeOnClickOverlay="true" @close="isShowSwitchPannel = !isShowSwitchPannel" :safeAreaInsetTop="true">
         <view>
@@ -1146,6 +1146,26 @@ export default {
   computed: {
     windowObj() {
       return this.$u.sys();
+    },
+    openListImageUrl() {
+      if (this.template !== 'BINGO' || !this.openImageDomain) {
+        return '';
+      }
+      const list = this.chatList || [];
+      for (let i = list.length - 1; i >= 0; i--) {
+        const item = list[i];
+        if (item.chatType === 'image' && item.content && item.content.indexOf('openlist_') > -1) {
+          return item.content.startsWith('http') ? item.content : (this.openImageDomain + item.content);
+        }
+      }
+      if (this.openResult && this.openResult.period && this.gid) {
+        const now = new Date();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const dstr = `${now.getFullYear()}${month}${day}`;
+        return `${this.openImageDomain}/upload/openimg/${dstr}/${this.gid}/openlist_${this.openResult.period}.webp`;
+      }
+      return '';
     }
   },
   watch: {

@@ -1,6 +1,6 @@
 <template>
   <view :class="template.toLowerCase()" class="open-num-list" v-if="isShow">
-    <view class="open-num-item">
+    <view class="open-num-item" v-if="!isBINGO">
       <view class="period span1">期数</view>
       <view class="drop-down-opened">
         <view class="scnumList" v-if="isPK10">
@@ -19,7 +19,7 @@
           <view class="gyhe">冠亚和</view>
           <view class="lh">1-5龙虎</view>
         </view>
-        <view class="sscnumList" v-if="isSSCOrBINGO">
+        <view class="sscnumList" v-if="isSSC">
           <view class="numList">
             <view class="span1">一</view>
             <view class="span1">二</view>
@@ -31,7 +31,7 @@
         </view>
       </view>
     </view>
-    <view class="van-pull-refresh">
+    <view class="van-pull-refresh" :class="{'bingo-image-wrap': isBINGO}">
       <!-- PK10模板 -->
       <template v-if="isPK10">
         <view class="open-num-item" v-for="item in formattedList" :key="generateKey(item)">
@@ -83,26 +83,52 @@
         </view>
       </template>
       
-      <!-- BINGO模板 -->
+      <!-- BINGO模板：与群聊开奖图片一致的表格样式 -->
       <template v-if="isBINGO">
-        <view class="open-num-item" v-for="item in formattedList" :key="generateKey(item)">
-          <span class="period">{{ item.shortPeriod }}</span>
-          <view class="drop-down-opened">
-            <view class="open-num min open-num-ul">
-              <view 
-                class="drop-down-list-item-ul-li" 
-                v-for="(it, itIndex) in item.openNum" 
-                :key="generateKey(item, itIndex)"
-                :class="'b'+it"
-              >{{ it }}</view>
+        <view class="bingo-image-panel">
+          <scroll-view scroll-y class="bingo-image-scroll">
+            <view v-if="showBingoImage && resolvedOpenListImageUrl" class="bingo-openlist-image-wrap">
+              <image
+                class="bingo-openlist-image"
+                :src="resolvedOpenListImageUrl"
+                mode="widthFix"
+                @error="onBingoImageError"
+              />
             </view>
-            <view class="sscSum">
-              <view class="red" style="font-weight: bold">{{ item.property.sum }}</view>
-              <view :class="getBigSmallClass(item.property.sumBigSmall)">{{ item.property.sumBigSmall }}</view>
-              <view :class="getSingleDoubleClass(item.property.sumSingleDouble)">{{ item.property.sumSingleDouble }}</view>
-              <view :class="getDragonTigerClass(item.property.dragonTigerNum)">{{ item.property.dragonTigerNum }}</view>
+            <view v-else class="bingo-openlist-table">
+              <view
+                class="bingo-image-row"
+                v-for="item in bingoImageList"
+                :key="generateKey(item)"
+              >
+                <view class="col-period">{{ getBingoPeriodDisplay(item) }}</view>
+                <view class="col-time">{{ item.shortOpenTime || '--:--' }}</view>
+                <view class="col-balls">
+                  <view
+                    class="ball-cell"
+                    v-for="(num, ballIndex) in item.openNum"
+                    :key="generateKey(item, ballIndex)"
+                  >
+                    <text :class="getBingoNumClass(num)">{{ num }}</text>
+                    <text :class="getBingoBigSmallClass(item.property.bigSmalls && item.property.bigSmalls[ballIndex])">
+                      {{ (item.property.bigSmalls && item.property.bigSmalls[ballIndex]) || '-' }}
+                    </text>
+                    <text :class="getBingoSingleDoubleClass(item.property.singleDoubles && item.property.singleDoubles[ballIndex])">
+                      {{ (item.property.singleDoubles && item.property.singleDoubles[ballIndex]) || '-' }}
+                    </text>
+                  </view>
+                </view>
+                <view class="col-sum">
+                  <text class="red">{{ item.property.sum }}</text>
+                  <text :class="getBingoBigSmallClass(item.property.sumBigSmall)">{{ item.property.sumBigSmall }}</text>
+                  <text :class="getBingoSingleDoubleClass(item.property.sumSingleDouble)">{{ item.property.sumSingleDouble }}</text>
+                </view>
+                <view class="col-lh">
+                  <text :class="getBingoDragonTigerClass(item.property.dragonTigerNum)">{{ item.property.dragonTigerNum }}</text>
+                </view>
+              </view>
             </view>
-          </view>
+          </scroll-view>
         </view>
       </template>
     </view>
@@ -117,7 +143,7 @@
 		name: 'open-num-list',
 		data() {
 			return {
-				// 可以在这里添加组件内部状态数据
+				showBingoImage: true
 			};
 		},
 		computed: {
@@ -163,6 +189,13 @@
 					'BINGO': '宾果'
 				};
 				return names[this.template] || this.template;
+			},
+			resolvedOpenListImageUrl() {
+				return this.openListImageUrl || '';
+			},
+			bingoImageList() {
+				const rows = this.formattedList.slice(0, 31);
+				return rows.slice().reverse();
 			}
 		},
 		watch: {
@@ -174,6 +207,14 @@
 					}
 				},
 				immediate: true
+			},
+			openListImageUrl() {
+				this.showBingoImage = true;
+			},
+			isShow(val) {
+				if (val && this.isBINGO) {
+					this.showBingoImage = true;
+				}
 			}
 		},
 		beforeDestroy() {
@@ -214,6 +255,11 @@
 				validator(value) {
 					return value > 0 && value <= 100;
 				}
+			},
+			// 宾果开奖列表图片地址（与群聊发送的开奖图一致）
+			openListImageUrl: {
+				type: String,
+				default: ''
 			}
 		},
 		methods: {
@@ -248,6 +294,32 @@
 			getSingleDoubleClass(value) {
 				if (!value) return '';
 				return value === '双' ? 'red' : 'blue';
+			},
+			getBingoBigSmallClass(value) {
+				if (!value) return '';
+				return value === '大' ? 'red' : 'black';
+			},
+			getBingoSingleDoubleClass(value) {
+				if (!value) return '';
+				return value === '双' ? 'red' : 'black';
+			},
+			getBingoDragonTigerClass(value) {
+				if (!value) return '';
+				if (value === '龙') return 'red';
+				if (value === '虎') return 'black';
+				return 'green';
+			},
+			getBingoPeriodDisplay(item) {
+				const period = item.period || item.shortPeriod || '';
+				return String(period).slice(-3);
+			},
+			getBingoNumClass(num) {
+				const value = parseInt(num, 10);
+				if (Number.isNaN(value)) return 'black';
+				return value > 40 ? 'red' : 'black';
+			},
+			onBingoImageError() {
+				this.showBingoImage = false;
 			},
 			// 生成唯一key
 			generateKey(item, suffix = '') {
@@ -608,7 +680,149 @@ $white-color: #fff;
   }
 }
 
-// BINGO 特定样式
+// BINGO 特定样式 - 与群聊开奖图片一致的展开面板
+.bingo {
+  &.open-num-list {
+    max-height: none;
+    background: transparent;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  .bingo-image-wrap {
+    flex: 1;
+    overflow: visible;
+  }
+
+  .bingo-image-panel {
+    width: 100%;
+    background: #fff;
+  }
+
+  .bingo-image-scroll {
+    max-height: calc(100vh - 220px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .bingo-openlist-image-wrap {
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+    padding-bottom: 121.12%;
+    height: 0;
+  }
+
+  .bingo-openlist-image {
+    position: absolute;
+    top: -5.04%;
+    left: 0;
+    width: 100%;
+    display: block;
+  }
+
+  .bingo-openlist-table {
+    width: 100%;
+    background: url(../../static/img/bg/openlist-nobanner.png) no-repeat top center;
+    background-size: 100% auto;
+    padding-top: 3.05%;
+    min-height: 400px;
+  }
+
+  .bingo-image-row {
+    display: flex;
+    align-items: center;
+    min-height: 28px;
+    height: 2.8vw;
+    padding: 0 0.6%;
+    box-sizing: border-box;
+    font-size: 2.3vw;
+    font-weight: 700;
+    line-height: 1;
+    color: #000;
+
+    text {
+      text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+    }
+
+    .red {
+      color: #dc1414;
+    }
+
+    .black {
+      color: #000;
+    }
+
+    .green {
+      color: #28a745;
+    }
+  }
+
+  .col-period {
+    width: 7%;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .col-time {
+    width: 7%;
+    text-align: center;
+    flex-shrink: 0;
+    font-size: 2vw;
+  }
+
+  .col-balls {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 1%;
+    min-width: 0;
+  }
+
+  .ball-cell {
+    flex: 1;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    max-width: 13%;
+
+    text {
+      flex: 1;
+      text-align: center;
+      font-size: 2.15vw;
+    }
+
+    text:first-child {
+      font-size: 2.3vw;
+    }
+  }
+
+  .col-sum {
+    width: 14%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex-shrink: 0;
+
+    text {
+      font-size: 2.15vw;
+    }
+  }
+
+  .col-lh {
+    width: 8%;
+    text-align: center;
+    flex-shrink: 0;
+    font-size: 2.3vw;
+  }
+
+  .btns {
+    position: relative;
+    z-index: 2;
+  }
+}
+
+// BINGO 旧版紧凑列表样式（保留给其他页面引用）
 .bingo {
   .open-num-item {
     .period {
@@ -637,7 +851,7 @@ $white-color: #fff;
     }
   }
   
-  .van-pull-refresh {
+  .van-pull-refresh:not(.bingo-image-wrap) {
     .open-num {
       display: flex;
       justify-content: space-around;
