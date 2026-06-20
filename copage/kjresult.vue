@@ -1,48 +1,64 @@
 <template>
   <view class="layout skin_blue" :class="{'layout-bingo-group': isBingoGroupStyle}">
-    <!-- 这里就很整洁了，只要设置ref，绑定query事件，绑定list就可以了 -->
-    <z-paging ref="paging" v-model="list" @query="getResultByDate" :default-page-size="20" :paging-style="isBingoGroupStyle ? pagingGroupStyle : {}">
-      <!-- 需要固定在顶部不滚动的view放在slot="top"的view中，如果需要跟着滚动，则不要设置slot="top" -->
-      <template #top>
-        <view class="t-head">
-          <view class="t-head-m1">
-            <TsCustom :backUrl="backUrl" :isBack="true" title="开奖结果">
-              <block slot='right' v-if="siteConfig.kjwurl">
-                  <view @click="qgkjw" class="right-icon"><view class="right-btn">全国开奖网</view></view>
-              </block>
-            </TsCustom>
-            <view class="header-wrapper">
-              <view class="lotteryName" @click="isShowGamePanel = !isShowGamePanel">
-                <view>{{ currentGname }}</view>
-                <u-icon color="#999" size="20" name="arrow-down"></u-icon>
-              </view>
-              <view class="datePicker" @click="datepicker()">
-                <view>{{ query.date }}</view>
-                <u-icon color="#999" size="25" name="calendar"></u-icon>
-              </view>
+    <block v-if="pageInited">
+      <view class="t-head">
+        <view class="t-head-m1">
+          <TsCustom :backUrl="backUrl" :isBack="true" title="开奖结果">
+            <block slot='right' v-if="siteConfig.kjwurl">
+                <view @click="qgkjw" class="right-icon"><view class="right-btn">全国开奖网</view></view>
+            </block>
+          </TsCustom>
+          <view class="header-wrapper">
+            <view class="lotteryName" @click="isShowGamePanel = !isShowGamePanel">
+              <view>{{ currentGname }}</view>
+              <u-icon color="#999" size="20" name="arrow-down"></u-icon>
             </view>
-          </view>
-          <view class="t-table-header" v-if="!isBingoGroupStyle">
-            <view class="t-table-header__th">期数/时间</view>
-            <view class="t-table-header__th van-tag-box">
-              <view v-for="(item,index) in curTabList" :key="index" class="van-tag van-tag--default" @click="sel(index)" :class="{'van-tag--primary':tclass == index}">{{ item }}</view>
+            <view class="datePicker" @click="datepicker()">
+              <view>{{ query.date }}</view>
+              <u-icon color="#999" size="25" name="calendar"></u-icon>
             </view>
           </view>
         </view>
-      </template>
-      <!-- 群样式：复用聊天室下拉 open-num-list，全宽铺满 -->
-      <view v-if="isBingoGroupStyle" class="kjresult-group-wrap">
-        <open-num-list
-          pageMode
-          :isShow="true"
-          template="BINGO"
-          :list="list"
-          :historyStyle="1"
-          :maxItems="10000"
-        />
+        <view class="t-table-header" v-if="!isBingoGroupStyle">
+          <view class="t-table-header__th">期数/时间</view>
+          <view class="t-table-header__th van-tag-box">
+            <view v-for="(item,index) in curTabList" :key="index" class="van-tag van-tag--default" @click="sel(index)" :class="{'van-tag--primary':tclass == index}">{{ item }}</view>
+          </view>
+        </view>
       </view>
-      <view v-else class="t-table">
-        <view v-for="(item,index) in list" class="t-table-body__tr" :key="index">
+
+      <!-- 宾果群样式：HTML 表格铺满 header 以下区域 -->
+      <view v-if="isBingoGroupStyle" class="bingo-result-body">
+        <scroll-view
+          scroll-y
+          :enable-flex="true"
+          class="bingo-result-scroll"
+          :style="bingoScrollStyle"
+          :lower-threshold="100"
+          @scrolltolower="loadMoreBingo"
+        >
+          <view class="bingo-result-scroll-inner">
+            <open-num-list
+              :key="'bingo-' + query.gid + '-' + query.date + '-' + headHeight"
+              pageMode
+              :isShow="true"
+              template="BINGO"
+              :list="bingoList"
+              :historyStyle="1"
+              :maxItems="10000"
+              :pageHeaderHeight="headHeight"
+              :pageBodyHeight="bingoBodyHeight"
+            />
+          </view>
+        </scroll-view>
+        <view v-if="bingoLoading" class="bingo-load-tip">加载中...</view>
+      </view>
+
+      <!-- 基本样式：z-paging 列表 -->
+      <view v-else class="kjresult-paging-wrap" :key="'basic-' + query.gid + '-' + query.date + '-' + template">
+        <z-paging ref="paging" v-model="list" @query="getResultByDate" :default-page-size="20">
+          <view class="t-table">
+            <view v-for="(item,index) in list" class="t-table-body__tr" :key="index">
           <view class="t-table-body__td period van-hairline--bottom">
             {{ item.period }}<br>
             <view class="time span1">{{ item.shortOpenTime }}</view>
@@ -118,9 +134,11 @@
             </view>
           </view>
         </view>
+          </view>
+        </z-paging>
       </view>
-    </z-paging>
-    <u-calendar :closeOnClickOverlay="true" @close="showcalendar = !showcalendar" :defaultDate="query.date" :minDate="minDate" :maxDate="maxDate" :show="showcalendar" @confirm="change" mode="single"></u-calendar>
+    </block>
+    <u-calendar v-if="showcalendar" :closeOnClickOverlay="true" @close="showcalendar = !showcalendar" :defaultDate="query.date" :minDate="minDate" :maxDate="maxDate" :show="showcalendar" @confirm="change" mode="single"></u-calendar>
     <u-overlay :show="isShowGamePanel" @click="isShowGamePanel = false" :style="{'top':top+'px'}">
       <u-transition @tap.stop :show="isShowGamePanel" :customStyle="{'position':'fixed','width':'100%'}" mode="fade">
         <view style="border-top: 1px solid #eee;">
@@ -157,15 +175,31 @@ export default {
       query:{gid:0,date:''},
       backUrl:"copage/chat",
       list:[],
+      bingoList: [],
+      bingoPage: 1,
+      bingoLoading: false,
+      bingoNoMore: false,
       minDate:'',
       maxDate:'',
-      isShowGamePanel:false
+      isShowGamePanel:false,
+      pageInited: false,
+      pageHasShown: false,
+      headHeight: 0
     };
   },
   onReady() {
-    this.$u.getRect('.t-head-m1').then(res => {
-      this.top = res.height;
-    })
+    this.updateHeadHeight();
+  },
+  onShow() {
+    this.updateHeadHeight();
+    if (this.pageHasShown && this.pageInited) {
+      if (this.isBingoGroupStyle) {
+        this.loadBingoHistory(1);
+      } else {
+        this.refreshResultList();
+      }
+    }
+    this.pageHasShown = true;
   },
   onLoad(){
     this.backUrl = uni.getStorageSync('backUrl');
@@ -182,10 +216,19 @@ export default {
     isBingoGroupStyle() {
       return this.template === 'BINGO' && (this.openHistoryStyle == 1 || this.openHistoryStyle === '1');
     },
-    pagingGroupStyle() {
+    bingoBodyHeight() {
+      const sys = uni.getSystemInfoSync();
+      const windowH = sys.windowHeight || 667;
+      const headH = this.headHeight || 130;
+      return Math.max(windowH - headH, 0);
+    },
+    bingoScrollStyle() {
+      if (!this.bingoBodyHeight) {
+        return {};
+      }
       return {
-        width: '100%',
-        background: '#fff'
+        height: this.bingoBodyHeight + 'px',
+        maxHeight: this.bingoBodyHeight + 'px'
       };
     }
   },
@@ -193,15 +236,131 @@ export default {
     siteConfig() {
       return siteConfig
     },
-    getResultByDate(pageNo, pageSize) {
-      // 组件加载时会自动触发此方法，因此默认页面加载时会自动触发，无需手动调用
-      // 这里的pageNo和pageSize会自动计算好，直接传给服务器即可
-      // 模拟请求服务器获取分页数据，请替换成自己的网络请求
-      const param = this.query;
-      param.page = pageNo;
-      param.pageSize = pageSize || 20; // 确保每页20条数据
+    updateHeadHeight() {
+      this.$nextTick(() => {
+        this.$u.getRect('.t-head').then(res => {
+          if (res && res.height) {
+            this.headHeight = Math.ceil(res.height);
+          }
+        });
+        this.$u.getRect('.t-head-m1').then(res => {
+          if (res && res.height) {
+            this.top = res.height;
+          }
+        });
+      });
+    },
+    calcBingoVisibleRows() {
+      const sys = uni.getSystemInfoSync();
+      const w = sys.windowWidth || 375;
+      const h = sys.windowHeight || 667;
+      const headH = this.headHeight || 130;
+      const tableTop = (29 / 786) * w;
+      const rowH = (28 / 786) * w;
+      const available = Math.max(h - headH - tableTop, rowH);
+      return Math.max(Math.ceil(available / rowH), 1);
+    },
+    getBingoFetchPageSize() {
+      const visibleRows = this.calcBingoVisibleRows();
+      return Math.max(visibleRows + 15, 60);
+    },
+    resetResultLists() {
+      this.bingoList = [];
+      this.list = [];
+      this.bingoPage = 1;
+      this.bingoNoMore = false;
+    },
+    refreshResultList() {
+      if (this.isBingoGroupStyle) {
+        this.loadBingoHistory(1);
+        return;
+      }
+      if (!this.query.gid || !this.query.date || !this.$refs.paging) {
+        return;
+      }
+      this.$refs.paging.reload(true);
+    },
+    applyBingoRecords(records, pageNo, pageSize) {
+      if (pageNo === 1) {
+        this.bingoList = records.slice();
+      } else {
+        this.bingoList = this.bingoList.concat(records);
+      }
+      this.bingoPage = pageNo;
+      this.bingoNoMore = records.length < pageSize;
+    },
+    loadBingoHistory(pageNo = 1) {
+      if (!this.query.gid || this.bingoLoading) {
+        return;
+      }
+      if (pageNo > 1 && this.bingoNoMore) {
+        return;
+      }
+      const pageSize = this.getBingoFetchPageSize();
+      this.bingoLoading = true;
+      if (pageNo === 1) {
+        this.bingoNoMore = false;
+      }
+      const param = {
+        gid: this.query.gid,
+        page: pageNo,
+        pageSize
+      };
+      if (this.query.date) {
+        param.date = this.query.date;
+      }
       this.$u.api.common.resultByDate(param).then(res => {
-        const records = res.data.records || [];
+        if (!res || !res.data) {
+          this.bingoLoading = false;
+          if (pageNo === 1) {
+            this.bingoList = [];
+          }
+          return;
+        }
+        let records = Array.isArray(res.data.records) ? res.data.records : [];
+        if (records.length === 0 && pageNo === 1 && param.date) {
+          return this.$u.api.common.resultByDate({
+            gid: this.query.gid,
+            page: 1,
+            pageSize
+          }).then(res2 => {
+            this.bingoLoading = false;
+            if (res2 && res2.data && Array.isArray(res2.data.records)) {
+              records = res2.data.records;
+            }
+            this.applyBingoRecords(records, pageNo, pageSize);
+          }).catch(() => {
+            this.bingoLoading = false;
+          });
+        }
+        this.bingoLoading = false;
+        this.applyBingoRecords(records, pageNo, pageSize);
+      }).catch(() => {
+        this.bingoLoading = false;
+      });
+    },
+    loadMoreBingo() {
+      if (!this.bingoLoading && !this.bingoNoMore) {
+        this.loadBingoHistory(this.bingoPage + 1);
+      }
+    },
+    getResultByDate(pageNo, pageSize) {
+      if (!this.query.gid || !this.query.date) {
+        this.$refs.paging && this.$refs.paging.complete([]);
+        return;
+      }
+      const param = {
+        gid: this.query.gid,
+        date: this.query.date,
+        page: pageNo,
+        pageSize: pageSize || 20
+      };
+      this.$u.api.common.resultByDate(param).then(res => {
+        if (!res || !res.data) {
+          this.$refs.paging && this.$refs.paging.complete([]);
+          return;
+        }
+        const records = Array.isArray(res.data.records) ? res.data.records : [];
         const total = res.data.total || records.length;
         if (this.$refs.paging.completeByTotal) {
           this.$refs.paging.completeByTotal(records, total);
@@ -221,9 +380,10 @@ export default {
         if (res.data && res.data.openHistoryStyle !== undefined) {
           this.openHistoryStyle = res.data.openHistoryStyle;
           uni.setStorageSync('kjresultHistoryStyle', res.data.openHistoryStyle);
-          if (prevStyle != this.openHistoryStyle && this.$refs.paging) {
+          if (prevStyle != this.openHistoryStyle && this.pageInited) {
+            this.resetResultLists();
             this.$nextTick(() => {
-              this.$refs.paging.reload(true);
+              this.refreshResultList();
             });
           }
         }
@@ -268,8 +428,8 @@ export default {
       this.djxlshow = false;
       this.tclass = 0;
       this.curTabList = this.tablist[this.template];
-      this.$refs.paging.reload(true);
-
+      this.resetResultLists();
+      this.refreshResultList();
     },
     loadGameList(flag = 0){
       this.$u.api.common.getGameListByIfok().then(res => {
@@ -290,7 +450,17 @@ export default {
           }
         }
         this.curTabList = this.tablist[this.template];
-        flag == 0 && this.$refs.paging.reload(true);
+        this.pageInited = true;
+        this.$nextTick(() => {
+          if (this.isBingoGroupStyle) {
+            this.$u.getRect('.t-head').then(res => {
+              if (res && res.height) {
+                this.headHeight = Math.ceil(res.height);
+              }
+              this.loadBingoHistory(1);
+            });
+          }
+        });
       }).catch(err => {
         uni.$utils.showToast(err);
       });
@@ -298,7 +468,8 @@ export default {
     change(e){
       this.showcalendar = !this.showcalendar;
       this.query.date = e[0];
-      this.$refs.paging.reload(true);
+      this.resetResultLists();
+      this.refreshResultList();
     },
     sel(index) {
       this.tclass = index;
@@ -329,9 +500,69 @@ export default {
   height:100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+
+  /* u-calendar 的 u-popup 默认 flex:1，否则会占据主内容下方大块空白 */
+  ::v-deep .u-popup {
+    flex: 0 0 auto !important;
+    height: 0;
+    overflow: visible;
+  }
 }
 
-.layout.layout-bingo-group {
+.bingo-result-body {
+  width: 100%;
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  position: relative;
+  overflow: hidden;
+}
+
+.bingo-result-scroll {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.bingo-result-scroll-inner {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bingo-result-body .bingo-load-tip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 16rpx;
+  z-index: 10;
+  pointer-events: none;
+  padding: 0;
+  background: transparent;
+}
+
+.bingo-load-tip-fixed {
+  display: none;
+}
+
+.bingo-load-tip {
+  text-align: center;
+  padding: 20rpx 0 40rpx;
+  color: #999;
+  font-size: 24rpx;
+}
+
+.kjresult-paging-wrap {
+  flex: 1;
+  height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   background-color: #fff;
 
   ::v-deep .zp-paging-container-content,
@@ -350,8 +581,19 @@ export default {
   }
 }
 
+.layout.layout-bingo-group {
+  background-color: #fff;
+  height: 100vh;
+  min-height: 100vh;
+
+  .t-head {
+    flex-shrink: 0;
+  }
+}
+
 .kjresult-group-wrap {
   width: 100%;
+  min-height: calc(100vh - 190px);
   flex: 1;
   background: #fff;
   box-sizing: border-box;
