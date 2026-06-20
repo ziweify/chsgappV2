@@ -145,6 +145,8 @@ const BINGO_OPENLIST = {
 	BANNER_H: 48,
 	START_Y: 77,
 	ROW_H: 28,
+	// 查看更多页：表头与首行数据之间的间距（786 画布 px）
+	HEADER_BODY_GAP: 7,
 	TEXT_BASELINE: 15,
 	PERIOD_X: 5,
 	TIME_X: 59,
@@ -324,7 +326,7 @@ const BINGO_OPENLIST = {
 				}
 				const w = this.windowWidth || 375;
 				const scale = w / BINGO_OPENLIST.BG_W;
-				const tableTopPx = (BINGO_OPENLIST.START_Y - BINGO_OPENLIST.BANNER_H) * scale;
+				const tableTopPx = this.bingoDataBodyTopPx();
 				const rowHPx = BINGO_OPENLIST.ROW_H * scale;
 				const bodyH = this.bingoResolvedBodyHeight;
 				if (bodyH > 0) {
@@ -340,12 +342,12 @@ const BINGO_OPENLIST = {
 				const { BG_W, START_Y, BANNER_H, ROW_H, NOBANNER_H } = BINGO_OPENLIST;
 				const w = this.windowWidth || 375;
 				const scale = w / BG_W;
-				const tableTop = START_Y - BANNER_H;
+				const dataTop = this.bingoDataBodyTop();
 				const dataRowCount = this.bingoImageList.length;
 				if (this.pageMode) {
 					const minRows = this.bingoPageMinRows;
 					const rowCount = Math.max(dataRowCount, minRows, 1);
-					const contentHeightPx = (tableTop + ROW_H * rowCount) * scale;
+					const contentHeightPx = (dataTop + ROW_H * rowCount) * scale;
 					const viewportH = this.bingoResolvedBodyHeight;
 					const tableHeightPx = viewportH > 0
 						? Math.max(contentHeightPx, viewportH)
@@ -359,6 +361,7 @@ const BINGO_OPENLIST = {
 				}
 				const minRows = 1;
 				const rowCount = Math.max(dataRowCount, minRows, 1);
+				const tableTop = START_Y - BANNER_H;
 				const contentHeightPx = (tableTop + ROW_H * rowCount) * scale;
 				const tableHeightPx = Math.max(contentHeightPx, NOBANNER_H * scale);
 				return {
@@ -582,6 +585,17 @@ const BINGO_OPENLIST = {
 			bingoHeaderBodyTop() {
 				return BINGO_OPENLIST.START_Y - BINGO_OPENLIST.BANNER_H;
 			},
+			bingoDataBodyTop() {
+				const base = this.bingoHeaderBodyTop();
+				if (this.pageMode) {
+					return base + BINGO_OPENLIST.HEADER_BODY_GAP;
+				}
+				return base;
+			},
+			bingoDataBodyTopPx() {
+				const w = this.windowWidth || 375;
+				return this.bingoDataBodyTop() * (w / BINGO_OPENLIST.BG_W);
+			},
 			bingoHeaderBandSpecs() {
 				const O = BINGO_OPENLIST;
 				const bands = [
@@ -609,7 +623,7 @@ const BINGO_OPENLIST = {
 			},
 			bingoGridLayerStyle() {
 				return {
-					top: this.bingoPxVw(this.bingoHeaderBodyTop())
+					top: this.bingoPxVw(this.bingoDataBodyTop())
 				};
 			},
 			bingoHeaderTextStyle(x, fontSize, extraX = 0) {
@@ -672,11 +686,11 @@ const BINGO_OPENLIST = {
 			bingoPeriodColStyle() {
 				return {
 					width: this.bingoPxVw(BINGO_OPENLIST.PERIOD_COL_W),
-					top: this.bingoPxVw(this.bingoHeaderBodyTop())
+					top: this.bingoPxVw(this.bingoDataBodyTop())
 				};
 			},
 			getBingoRowStyle(rowIndex) {
-				const top = (BINGO_OPENLIST.START_Y - BINGO_OPENLIST.BANNER_H) + BINGO_OPENLIST.ROW_H * rowIndex;
+				const top = this.bingoDataBodyTop() + BINGO_OPENLIST.ROW_H * rowIndex;
 				return {
 					top: this.bingoPxVw(top),
 					height: this.bingoPxVw(BINGO_OPENLIST.ROW_H)
