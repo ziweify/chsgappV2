@@ -304,11 +304,18 @@ const BINGO_OPENLIST = {
 				}
 				const dataRows = this.bingoImageList;
 				const rowCount = Math.max(dataRows.length, this.bingoPageMinRows, 1);
+				const padCount = Math.max(rowCount - dataRows.length, 0);
 				const rows = [];
-				for (let i = 0; i < rowCount; i++) {
+				for (let i = 0; i < padCount; i++) {
 					rows.push({
-						item: dataRows[i] || null,
+						item: null,
 						index: i
+					});
+				}
+				for (let j = 0; j < dataRows.length; j++) {
+					rows.push({
+						item: dataRows[j],
+						index: padCount + j
 					});
 				}
 				return rows;

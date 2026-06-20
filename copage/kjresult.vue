@@ -35,6 +35,8 @@
           class="bingo-result-scroll"
           :style="bingoScrollStyle"
           :lower-threshold="100"
+          :scroll-into-view="bingoScrollIntoView"
+          :scroll-with-animation="false"
           @scrolltolower="loadMoreBingo"
         >
           <view class="bingo-result-scroll-inner">
@@ -49,6 +51,7 @@
               :pageHeaderHeight="headHeight"
               :pageBodyHeight="bingoBodyHeight"
             />
+            <view id="bingo-scroll-bottom" class="bingo-scroll-anchor"></view>
           </view>
         </scroll-view>
         <view v-if="bingoLoading" class="bingo-load-tip">加载中...</view>
@@ -184,7 +187,9 @@ export default {
       isShowGamePanel:false,
       pageInited: false,
       pageHasShown: false,
-      headHeight: 0
+      headHeight: 0,
+      bingoScrollIntoView: '',
+      bingoAllowLoadMore: false
     };
   },
   onReady() {
@@ -266,6 +271,7 @@ export default {
       this.list = [];
       this.bingoPage = 1;
       this.bingoNoMore = false;
+      this.bingoAllowLoadMore = false;
     },
     refreshResultList() {
       if (this.isBingoGroupStyle) {
@@ -285,6 +291,26 @@ export default {
       }
       this.bingoPage = pageNo;
       this.bingoNoMore = records.length < pageSize;
+      if (pageNo === 1) {
+        this.$nextTick(() => {
+          setTimeout(() => {
+            this.scrollBingoToBottom();
+          }, 60);
+        });
+      }
+    },
+    scrollBingoToBottom() {
+      if (!this.isBingoGroupStyle) {
+        return;
+      }
+      this.bingoAllowLoadMore = false;
+      this.bingoScrollIntoView = '';
+      this.$nextTick(() => {
+        this.bingoScrollIntoView = 'bingo-scroll-bottom';
+        setTimeout(() => {
+          this.bingoAllowLoadMore = true;
+        }, 600);
+      });
     },
     loadBingoHistory(pageNo = 1) {
       if (!this.query.gid || this.bingoLoading) {
@@ -337,9 +363,10 @@ export default {
       });
     },
     loadMoreBingo() {
-      if (!this.bingoLoading && !this.bingoNoMore) {
-        this.loadBingoHistory(this.bingoPage + 1);
+      if (!this.bingoAllowLoadMore || this.bingoLoading || this.bingoNoMore) {
+        return;
       }
+      this.loadBingoHistory(this.bingoPage + 1);
     },
     getResultByDate(pageNo, pageSize) {
       if (!this.query.gid || !this.query.date) {
@@ -537,6 +564,11 @@ export default {
 .bingo-result-scroll-inner {
   width: 100%;
   box-sizing: border-box;
+}
+
+.bingo-scroll-anchor {
+  width: 100%;
+  height: 1px;
 }
 
 .bingo-result-body .bingo-load-tip {
