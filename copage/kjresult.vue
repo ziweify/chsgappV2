@@ -55,15 +55,15 @@
       </view>
 
       <!-- 基本样式：z-paging 列表 -->
-      <view v-else class="kjresult-paging-wrap" :key="'basic-' + query.gid + '-' + query.date + '-' + template">
-        <z-paging ref="paging" v-model="list" @query="getResultByDate" :default-page-size="20">
+      <view v-else class="kjresult-paging-wrap" :key="'basic-' + query.gid + '-' + query.date + '-' + template + '-' + openHistoryStyle">
+        <z-paging ref="paging" v-model="list" :fixed="false" @query="getResultByDate" :default-page-size="20">
           <view class="t-table">
             <view v-for="(item,index) in list" class="t-table-body__tr" :key="index">
-          <view class="t-table-body__td period van-hairline--bottom">
-            {{ item.period }}<br>
-            <view class="time span1">{{ item.shortOpenTime }}</view>
-          </view>
-          <view class="t-table-body__td detail van-hairline--bottom">
+              <view class="t-table-body__td period van-hairline--bottom">
+                {{ item.period }}<br>
+                <view class="time span1">{{ item.shortOpenTime }}</view>
+              </view>
+              <view class="t-table-body__td detail van-hairline--bottom">
             <view class="sc pk10" v-if="template == 'PK10' && tclass == 0">
               <view class="b span1" :class="'ball-'+it" v-for="it in item.openNum" :key="it"></view>
             </view>
@@ -132,8 +132,8 @@
               <view class="n" :class="gclass(item.property.yxx2,5)">{{ item.property.yxx2 }}</view>
               <view class="n" :class="gclass(item.property.yxx3,5)">{{ item.property.yxx3 }}</view>
             </view>
-          </view>
-        </view>
+              </view>
+            </view>
           </view>
         </z-paging>
       </view>
@@ -192,6 +192,7 @@ export default {
   },
   onShow() {
     this.updateHeadHeight();
+    this.loadRoomConfig();
     if (this.pageHasShown && this.pageInited) {
       if (this.isBingoGroupStyle) {
         this.loadBingoHistory(1);
@@ -204,10 +205,6 @@ export default {
   onLoad(){
     this.backUrl = uni.getStorageSync('backUrl');
     this.query.gid = uni.getStorageSync('cgid');
-    const cachedStyle = uni.getStorageSync('kjresultHistoryStyle');
-    if (cachedStyle !== '' && cachedStyle !== null && cachedStyle !== undefined) {
-      this.openHistoryStyle = cachedStyle;
-    }
     this.top1 = uni.$utils.getDivicePx(this,94);
     this.loadRoomConfig();
     this.loadGameList(1);
@@ -502,6 +499,13 @@ export default {
   flex-direction: column;
   overflow: hidden;
 
+  .t-head {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+    background: #fff;
+  }
+
   /* u-calendar 的 u-popup 默认 flex:1，否则会占据主内容下方大块空白 */
   ::v-deep .u-popup {
     flex: 0 0 auto !important;
@@ -560,11 +564,15 @@ export default {
 .kjresult-paging-wrap {
   flex: 1;
   height: 0;
+  min-height: 0;
   width: 100%;
   display: flex;
   flex-direction: column;
   background-color: #fff;
+  position: relative;
+  z-index: 1;
 
+  ::v-deep .z-paging-content,
   ::v-deep .zp-paging-container-content,
   ::v-deep .zp-paging-container,
   ::v-deep .zp-paging-main,
@@ -573,6 +581,20 @@ export default {
   ::v-deep .zp-scroll-view {
     width: 100% !important;
     max-width: 100% !important;
+  }
+
+  ::v-deep .z-paging-content {
+    flex: 1;
+    height: 100% !important;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  ::v-deep .zp-view-super,
+  ::v-deep .zp-scroll-view-super {
+    flex: 1;
+    min-height: 0;
   }
 
   ::v-deep .zp-paging-container-content {
@@ -585,10 +607,6 @@ export default {
   background-color: #fff;
   height: 100vh;
   min-height: 100vh;
-
-  .t-head {
-    flex-shrink: 0;
-  }
 }
 
 .kjresult-group-wrap {
