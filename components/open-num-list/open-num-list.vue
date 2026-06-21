@@ -86,19 +86,29 @@
       <!-- BINGO模板：群样式（聊天下拉 CSS 表格；查看更多页同组件） -->
       <template v-if="isBingoGroupStyle">
         <view class="bingo-image-panel">
-          <scroll-view
+          <view
             v-if="!pageMode"
-            scroll-y
-            class="bingo-image-scroll bingo-image-scroll-chat"
-            :style="bingoChatScrollStyle"
-            :scroll-into-view="chatScrollIntoView"
-            :scroll-with-animation="false"
+            class="bingo-chat-panel"
+            :style="bingoChatPanelStyle"
           >
-            <view class="bingo-openlist-table bingo-openlist-table-drawn" :style="bingoTableStyle">
-              <bingo-openlist-drawn-body :rows="bingoTableDisplayRows" />
+            <view class="bingo-openlist-table bingo-openlist-table-drawn bingo-openlist-table-chat">
+              <view class="bingo-chat-header-fixed" :style="bingoChatHeaderShellStyle">
+                <bingo-openlist-drawn-body part="header" :rows="[]" />
+              </view>
+              <scroll-view
+                scroll-y
+                class="bingo-chat-body-scroll"
+                :style="bingoChatBodyScrollStyle"
+                :scroll-into-view="chatScrollIntoView"
+                :scroll-with-animation="false"
+              >
+                <view class="bingo-chat-body-inner" :style="bingoChatBodyInnerStyle">
+                  <bingo-openlist-drawn-body part="body" :rows="bingoTableDisplayRows" />
+                  <view id="bingo-chat-tail" class="bingo-chat-tail-anchor"></view>
+                </view>
+              </scroll-view>
             </view>
-            <view id="bingo-chat-tail" class="bingo-chat-tail-anchor"></view>
-          </scroll-view>
+          </view>
           <view v-else class="bingo-image-scroll bingo-image-scroll-page">
             <view class="bingo-openlist-table bingo-openlist-table-drawn bingo-openlist-table-page" :style="bingoTableStyle">
               <bingo-openlist-drawn-body :rows="bingoTableDisplayRows" />
@@ -238,8 +248,7 @@ const BINGO_OPENLIST = {
 					return [];
 				}
 				const limit = this.pageMode ? this.maxItems : Math.min(this.maxItems, 50);
-				// 查看更多页由 z-paging 分页传入，不做严格 property 过滤
-				if (this.pageMode && this.isBingoGroupStyle) {
+				if (this.isBingoGroupStyle) {
 					return this.list.filter(item => {
 						return item &&
 							(item.shortPeriod || item.period || item.id) &&
@@ -286,8 +295,7 @@ const BINGO_OPENLIST = {
 					const source = Array.isArray(this.list) ? this.list : [];
 					return source.slice().reverse();
 				}
-				const source = this.formattedList.slice(0, this.bingoDropdownRowCount);
-				return source.slice().reverse();
+				return this.formattedList.slice().reverse();
 			},
 			bingoChatDisplayRowCount() {
 				if (this.pageMode) {
@@ -309,19 +317,58 @@ const BINGO_OPENLIST = {
 				const rowCount = this.bingoChatDisplayRowCount;
 				return (dataTop + ROW_H * rowCount) * scale;
 			},
+			bingoChatPanelHeightPx() {
+				const sys = uni.getSystemInfoSync();
+				const windowH = sys.windowHeight || 667;
+				return Math.floor(windowH * 0.52);
+			},
+			bingoChatPanelStyle() {
+				const h = this.bingoChatPanelHeightPx;
+				return {
+					height: h + 'px',
+					maxHeight: h + 'px',
+					overflow: 'hidden'
+				};
+			},
+			bingoChatHeaderShellStyle() {
+				const h = this.bingoDataBodyTopPx();
+				return {
+					height: h + 'px',
+					minHeight: h + 'px',
+					position: 'relative',
+					width: '100%',
+					overflow: 'hidden',
+					flexShrink: '0',
+					background: '#fff'
+				};
+			},
+			bingoChatBodyScrollStyle() {
+				const panelH = this.bingoChatPanelHeightPx;
+				const headerH = this.bingoDataBodyTopPx();
+				const bodyH = Math.max(panelH - headerH, 80);
+				return {
+					height: bodyH + 'px',
+					width: '100%'
+				};
+			},
+			bingoChatBodyInnerStyle() {
+				const { ROW_H } = BINGO_OPENLIST;
+				const w = this.windowWidth || 375;
+				const scale = w / BINGO_OPENLIST.BG_W;
+				const rowCount = this.bingoChatDisplayRowCount;
+				const h = Math.ceil(ROW_H * rowCount * scale);
+				return {
+					position: 'relative',
+					width: '100%',
+					height: h + 'px',
+					minHeight: h + 'px'
+				};
+			},
 			bingoChatScrollStyle() {
 				if (this.pageMode) {
 					return {};
 				}
-				const tableH = this.bingoChatTableHeightPx;
-				const sys = uni.getSystemInfoSync();
-				const windowH = sys.windowHeight || 667;
-				const maxH = Math.floor(windowH * 0.52);
-				const heightPx = Math.min(Math.ceil(tableH), maxH);
-				return {
-					height: heightPx + 'px',
-					maxHeight: maxH + 'px'
-				};
+				return this.bingoChatPanelStyle;
 			},
 			// 查看更多页内容区高度（优先用外层传入，否则按窗口估算）
 			bingoResolvedBodyHeight() {
@@ -432,16 +479,20 @@ const BINGO_OPENLIST = {
 		},
 		watch: {
 			list: {
-				handler(newList) {
-					if (newList && newList.length > 0) {
+				handler(newList, oldList) {
+					if (this.pageMode && newList && newList.length > 0) {
 						this.validateListData(newList);
-					}
-					if (this.pageMode) {
 						this.updateWindowSize();
 					}
+					if (!this.pageMode && this.isBingoGroupStyle && this.isShow) {
+						const prevLen = Array.isArray(oldList) ? oldList.length : 0;
+						const nextLen = Array.isArray(newList) ? newList.length : 0;
+						if (prevLen === 0 && nextLen > 0) {
+							this.scrollChatDropdownToBottom();
+						}
+					}
 				},
-				immediate: true,
-				deep: true
+				immediate: true
 			},
 			openListImageUrl() {
 				this.showBingoImage = true;
@@ -744,11 +795,33 @@ const BINGO_OPENLIST = {
 					top: this.bingoPxVw(this.bingoDataBodyTop())
 				};
 			},
-			getBingoRowStyle(rowIndex) {
+			getBingoRowStyle(rowIndex, layout = 'canvas') {
+				if (layout === 'stream') {
+					const top = BINGO_OPENLIST.ROW_H * rowIndex;
+					return {
+						top: this.bingoPxVw(top),
+						height: this.bingoPxVw(BINGO_OPENLIST.ROW_H)
+					};
+				}
 				const top = this.bingoDataBodyTop() + BINGO_OPENLIST.ROW_H * rowIndex;
 				return {
 					top: this.bingoPxVw(top),
 					height: this.bingoPxVw(BINGO_OPENLIST.ROW_H)
+				};
+			},
+			bingoChatPeriodColStyle() {
+				return {
+					width: this.bingoPxVw(BINGO_OPENLIST.PERIOD_COL_W),
+					top: '0',
+					bottom: '0',
+					height: '100%'
+				};
+			},
+			bingoChatGridLayerStyle() {
+				return {
+					top: '0',
+					bottom: '0',
+					height: '100%'
 				};
 			},
 			bingoBallNumStyle(ballIndex, num) {
@@ -823,7 +896,9 @@ const BINGO_OPENLIST = {
 			scrollChatDropdownToBottom() {
 				this.chatScrollIntoView = '';
 				this.$nextTick(() => {
-					this.chatScrollIntoView = 'bingo-chat-tail';
+					setTimeout(() => {
+						this.chatScrollIntoView = 'bingo-chat-tail';
+					}, 80);
 				});
 			},
 			// 生成唯一key
@@ -1216,6 +1291,36 @@ $white-color: #fff;
   .bingo-image-scroll {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .bingo-chat-panel {
+    width: 100%;
+    box-sizing: border-box;
+    background: #fff;
+  }
+
+  .bingo-openlist-table-chat {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .bingo-chat-header-fixed {
+    z-index: 4;
+    background: #fff;
+  }
+
+  .bingo-chat-body-scroll {
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .bingo-chat-body-inner {
+    position: relative;
+    width: 100%;
+    background: #fff;
   }
 
   .bingo-image-scroll-chat {

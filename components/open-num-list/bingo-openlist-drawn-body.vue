@@ -1,7 +1,7 @@
 <template>
-  <view class="bingo-drawn-body">
-    <view class="bingo-period-bg" :style="ctx.bingoPeriodColStyle()"></view>
-    <view class="bingo-table-header" :style="ctx.bingoHeaderAreaStyle()">
+  <view class="bingo-drawn-body" :class="{'bingo-drawn-body-stream': isStreamLayout}">
+    <view v-if="showPeriodBg" class="bingo-period-bg" :style="periodColStyle"></view>
+    <view v-if="showHeader" class="bingo-table-header" :style="ctx.bingoHeaderAreaStyle()">
       <view
         v-for="(band, idx) in ctx.bingoHeaderBandSpecs()"
         :key="'hb-' + idx"
@@ -19,7 +19,7 @@
       <view class="bingo-cell bingo-header-cell black" :style="ctx.bingoHeaderTextStyle(ctx.BINGO_OPENLIST.TOTAL_X + 18, ctx.BINGO_OPENLIST.FONT_DXDS)">总和</view>
       <view class="bingo-cell bingo-header-cell black" :style="ctx.bingoHeaderTextStyle(ctx.BINGO_OPENLIST.LH_X, ctx.BINGO_OPENLIST.FONT_LH)">龙虎</view>
     </view>
-    <view class="bingo-grid-layer" :style="ctx.bingoGridLayerStyle()">
+    <view v-if="showBody" class="bingo-grid-layer" :style="gridLayerStyle">
       <view
         v-for="(line, idx) in ctx.bingoGridLineSpecs()"
         :key="'vl-' + idx"
@@ -28,10 +28,11 @@
       ></view>
     </view>
     <view
+      v-if="showBody"
       class="bingo-image-row"
       v-for="row in rows"
       :key="row.item ? ctx.generateKey(row.item) : ('bingo-empty-' + row.index)"
-      :style="ctx.getBingoRowStyle(row.index)"
+      :style="rowStyle(row.index)"
     >
       <template v-if="row.item">
         <view class="bingo-cell" :style="ctx.bingoTextStyle(ctx.BINGO_OPENLIST.PERIOD_X, ctx.BINGO_OPENLIST.FONT_PERIOD)" :class="ctx.getBingoPeriodClass(row.item)">{{ ctx.getBingoPeriodDisplay(row.item) }}</view>
@@ -58,11 +59,44 @@ export default {
     rows: {
       type: Array,
       default: () => []
+    },
+    part: {
+      type: String,
+      default: 'full'
     }
   },
   computed: {
     ctx() {
       return this.bingoOpenlistCtx;
+    },
+    showHeader() {
+      return this.part === 'full' || this.part === 'header';
+    },
+    showPeriodBg() {
+      return this.part === 'full' || this.part === 'body';
+    },
+    showBody() {
+      return this.part === 'full' || this.part === 'body';
+    },
+    isStreamLayout() {
+      return this.part === 'body';
+    },
+    periodColStyle() {
+      if (this.isStreamLayout) {
+        return this.ctx.bingoChatPeriodColStyle();
+      }
+      return this.ctx.bingoPeriodColStyle();
+    },
+    gridLayerStyle() {
+      if (this.isStreamLayout) {
+        return this.ctx.bingoChatGridLayerStyle();
+      }
+      return this.ctx.bingoGridLayerStyle();
+    }
+  },
+  methods: {
+    rowStyle(rowIndex) {
+      return this.ctx.getBingoRowStyle(rowIndex, this.isStreamLayout ? 'stream' : 'canvas');
     }
   }
 };
@@ -75,6 +109,10 @@ export default {
   height: 100%;
   background: #fff;
   box-sizing: border-box;
+}
+
+.bingo-drawn-body-stream {
+  height: 100%;
 }
 
 .bingo-period-bg {
