@@ -145,8 +145,8 @@ const BINGO_OPENLIST = {
 	BANNER_H: 48,
 	START_Y: 77,
 	ROW_H: 28,
-	// 查看更多页：表头与首行数据之间的间距（786 画布 px）
-	HEADER_BODY_GAP: 7,
+	// 表头与首行数据之间的间距（786 画布 px，避免首行大字被表头遮住）
+	HEADER_BODY_GAP: 8,
 	TEXT_BASELINE: 15,
 	PERIOD_X: 5,
 	TIME_X: 59,
@@ -643,11 +643,7 @@ const BINGO_OPENLIST = {
 				return BINGO_OPENLIST.START_Y - BINGO_OPENLIST.BANNER_H;
 			},
 			bingoDataBodyTop() {
-				const base = this.bingoHeaderBodyTop();
-				if (this.pageMode) {
-					return base + BINGO_OPENLIST.HEADER_BODY_GAP;
-				}
-				return base;
+				return this.bingoHeaderBodyTop() + BINGO_OPENLIST.HEADER_BODY_GAP;
 			},
 			bingoDataBodyTopPx() {
 				const w = this.windowWidth || 375;
