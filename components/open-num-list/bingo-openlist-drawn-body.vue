@@ -138,9 +138,9 @@ export default {
   display: block;
   font-family: 'BingoOpenlist', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-weight: 700;
-  line-height: 1;
   white-space: nowrap;
   z-index: 2;
+  box-sizing: border-box;
   -webkit-text-size-adjust: none;
   text-size-adjust: none;
   -webkit-font-smoothing: antialiased;

@@ -147,7 +147,6 @@ const BINGO_OPENLIST = {
 	ROW_H: 28,
 	// 表头与首行数据之间的间距（786 画布 px，避免首行大字被表头遮住）
 	HEADER_BODY_GAP: 8,
-	TEXT_BASELINE: 15,
 	PERIOD_X: 5,
 	TIME_X: 59,
 	BALL_START_X: 94,
@@ -191,9 +190,7 @@ const BINGO_OPENLIST = {
 	// 最新一期下方预留空白行（表示下一期位置）
 	CHAT_DROPDOWN_TAIL_EMPTY_ROWS: 1,
 	// GD2 imagettftext 的 size 是 point；CSS font-size 是 px（96DPI 下 point×96/72）
-	FONT_POINT_TO_PX: 96 / 72,
-	// 描边+重绘后字形在行内略偏上，按 point→px 后的 ascender 比例微调
-	FONT_ASCENDER_RATIO: 0.88
+	FONT_POINT_TO_PX: 96 / 72
 };
 
 	export default {
@@ -624,13 +621,16 @@ const BINGO_OPENLIST = {
 					this.windowHeight = sys.windowHeight || this.windowHeight;
 				} catch (e) {}
 			},
-			// GD2 point → CSS px，再按 imagettftext 基线定位
+			// 数据行：在 ROW_H 格子内垂直居中（与表头居中方式一致）
 			bingoTextStyle(x, fontSize, extraX = 0) {
-				const scaledSize = fontSize * BINGO_OPENLIST.FONT_POINT_TO_PX;
-				const topInRow = BINGO_OPENLIST.TEXT_BASELINE - scaledSize * BINGO_OPENLIST.FONT_ASCENDER_RATIO;
+				const O = BINGO_OPENLIST;
+				const scaledSize = fontSize * O.FONT_POINT_TO_PX;
+				const rowH = O.ROW_H;
 				return {
 					left: this.bingoPxVw(x + extraX),
-					top: this.bingoPxVw(topInRow),
+					top: this.bingoPxVw(0),
+					height: this.bingoPxVw(rowH),
+					lineHeight: this.bingoPxVw(rowH),
 					fontSize: this.bingoPxVw(scaledSize)
 				};
 			},
@@ -680,12 +680,14 @@ const BINGO_OPENLIST = {
 				};
 			},
 			bingoHeaderTextStyle(x, fontSize, extraX = 0) {
-				const scaledSize = fontSize * BINGO_OPENLIST.FONT_POINT_TO_PX;
-				const headerH = BINGO_OPENLIST.START_Y - BINGO_OPENLIST.BANNER_H;
-				const topInHeader = (headerH - scaledSize * BINGO_OPENLIST.FONT_ASCENDER_RATIO) / 2 - 1;
+				const O = BINGO_OPENLIST;
+				const scaledSize = fontSize * O.FONT_POINT_TO_PX;
+				const headerH = O.START_Y - O.BANNER_H;
 				return {
 					left: this.bingoPxVw(x + extraX),
-					top: this.bingoPxVw(Math.max(topInHeader, 0)),
+					top: this.bingoPxVw(0),
+					height: this.bingoPxVw(headerH),
+					lineHeight: this.bingoPxVw(headerH),
 					fontSize: this.bingoPxVw(scaledSize)
 				};
 			},
@@ -1256,9 +1258,9 @@ $white-color: #fff;
     display: block;
     font-family: 'BingoOpenlist', 'PingFang SC', 'Microsoft YaHei', sans-serif;
     font-weight: 700;
-    line-height: 1;
     white-space: nowrap;
     z-index: 2;
+    box-sizing: border-box;
     -webkit-text-size-adjust: none;
     text-size-adjust: none;
     -webkit-font-smoothing: antialiased;
