@@ -83,21 +83,21 @@
         </view>
       </template>
       
-      <!-- BINGO模板：群样式（与群聊开奖图片一致） -->
+      <!-- BINGO模板：群样式（聊天下拉 CSS 表格；查看更多页同组件） -->
       <template v-if="isBingoGroupStyle">
         <view class="bingo-image-panel">
-          <view v-if="!pageMode && shouldShowBingoImage" class="bingo-openlist-image-wrap">
-            <image
-              class="bingo-openlist-image"
-              :src="resolvedOpenListImageUrl"
-              mode="widthFix"
-              @error="onBingoImageError"
-            />
-          </view>
-          <scroll-view v-else-if="!pageMode" scroll-y class="bingo-image-scroll">
+          <scroll-view
+            v-if="!pageMode"
+            scroll-y
+            class="bingo-image-scroll bingo-image-scroll-chat"
+            :style="bingoChatScrollStyle"
+            :scroll-into-view="chatScrollIntoView"
+            :scroll-with-animation="false"
+          >
             <view class="bingo-openlist-table bingo-openlist-table-drawn" :style="bingoTableStyle">
               <bingo-openlist-drawn-body :rows="bingoTableDisplayRows" />
             </view>
+            <view id="bingo-chat-tail" class="bingo-chat-tail-anchor"></view>
           </scroll-view>
           <view v-else class="bingo-image-scroll bingo-image-scroll-page">
             <view class="bingo-openlist-table bingo-openlist-table-drawn bingo-openlist-table-page" :style="bingoTableStyle">
@@ -186,6 +186,10 @@ const BINGO_OPENLIST = {
 	FONT_LH: 18,
 	NOBANNER_H: 952,
 	ROW_COUNT: 31,
+	// 聊天下拉（群样式）显示行数
+	CHAT_DROPDOWN_ROW_COUNT: 23,
+	// 最新一期下方预留空白行（表示下一期位置）
+	CHAT_DROPDOWN_TAIL_EMPTY_ROWS: 1,
 	// GD2 imagettftext 的 size 是 point；CSS font-size 是 px（96DPI 下 point×96/72）
 	FONT_POINT_TO_PX: 96 / 72,
 	// 描边+重绘后字形在行内略偏上，按 point→px 后的 ascender 比例微调
@@ -207,7 +211,8 @@ const BINGO_OPENLIST = {
 				showBingoImage: true,
 				BINGO_OPENLIST,
 				windowWidth: 375,
-				windowHeight: 667
+				windowHeight: 667,
+				chatScrollIntoView: ''
 			};
 		},
 		computed: {
@@ -270,20 +275,56 @@ const BINGO_OPENLIST = {
 			resolvedOpenListImageUrl() {
 				return this.openListImageUrl || '';
 			},
-			// 查看更多页用 HTML 表格 + 分页数据铺满整页；聊天下拉仍用 webp 图
+			bingoDropdownRowCount() {
+				return this.pageMode
+					? BINGO_OPENLIST.ROW_COUNT
+					: BINGO_OPENLIST.CHAT_DROPDOWN_ROW_COUNT;
+			},
+			// 查看更多页用 HTML 表格；聊天下拉也用 CSS 绘制（23 行，高度可控）
 			shouldShowBingoImage() {
-				if (this.pageMode) {
-					return false;
-				}
-				return !this.forceTable && this.showBingoImage && !!this.resolvedOpenListImageUrl;
+				return false;
 			},
 			bingoImageList() {
 				if (this.pageMode) {
 					const source = Array.isArray(this.list) ? this.list : [];
 					return source.slice().reverse();
 				}
-				const source = this.formattedList.slice(0, BINGO_OPENLIST.ROW_COUNT);
+				const source = this.formattedList.slice(0, this.bingoDropdownRowCount);
 				return source.slice().reverse();
+			},
+			bingoChatDisplayRowCount() {
+				if (this.pageMode) {
+					return Math.max(this.bingoImageList.length, 1);
+				}
+				return Math.max(
+					this.bingoImageList.length + BINGO_OPENLIST.CHAT_DROPDOWN_TAIL_EMPTY_ROWS,
+					1
+				);
+			},
+			bingoChatTableHeightPx() {
+				if (this.pageMode) {
+					return 0;
+				}
+				const { BG_W, ROW_H } = BINGO_OPENLIST;
+				const w = this.windowWidth || 375;
+				const scale = w / BG_W;
+				const dataTop = this.bingoDataBodyTop();
+				const rowCount = this.bingoChatDisplayRowCount;
+				return (dataTop + ROW_H * rowCount) * scale;
+			},
+			bingoChatScrollStyle() {
+				if (this.pageMode) {
+					return {};
+				}
+				const tableH = this.bingoChatTableHeightPx;
+				const sys = uni.getSystemInfoSync();
+				const windowH = sys.windowHeight || 667;
+				const maxH = Math.floor(windowH * 0.52);
+				const heightPx = Math.min(Math.ceil(tableH), maxH);
+				return {
+					height: heightPx + 'px',
+					maxHeight: maxH + 'px'
+				};
 			},
 			// 查看更多页内容区高度（优先用外层传入，否则按窗口估算）
 			bingoResolvedBodyHeight() {
@@ -300,7 +341,15 @@ const BINGO_OPENLIST = {
 			// 查看更多页：不足一屏时用空行占位，保证网格铺满整页
 			bingoPageDisplayRows() {
 				if (!this.pageMode) {
-					return this.bingoImageList.map((item, index) => ({ item, index }));
+					const rows = this.bingoImageList.map((item, index) => ({ item, index }));
+					const tailCount = BINGO_OPENLIST.CHAT_DROPDOWN_TAIL_EMPTY_ROWS;
+					for (let i = 0; i < tailCount; i++) {
+						rows.push({
+							item: null,
+							index: rows.length
+						});
+					}
+					return rows;
 				}
 				const dataRows = this.bingoImageList;
 				const rowCount = Math.max(dataRows.length, this.bingoPageMinRows, 1);
@@ -367,15 +416,13 @@ const BINGO_OPENLIST = {
 					};
 				}
 				const minRows = 1;
-				const rowCount = Math.max(dataRowCount, minRows, 1);
-				const tableTop = START_Y - BANNER_H;
-				const contentHeightPx = (tableTop + ROW_H * rowCount) * scale;
-				const tableHeightPx = Math.max(contentHeightPx, NOBANNER_H * scale);
+				const rowCount = this.bingoChatDisplayRowCount;
+				const contentHeightPx = (this.bingoDataBodyTop() + ROW_H * rowCount) * scale;
 				return {
 					position: 'relative',
 					width: '100%',
-					height: tableHeightPx + 'px',
-					minHeight: tableHeightPx + 'px'
+					height: contentHeightPx + 'px',
+					minHeight: contentHeightPx + 'px'
 				};
 			}
 		},
@@ -415,6 +462,9 @@ const BINGO_OPENLIST = {
 			isShow(val) {
 				if (val && this.isBingoGroupStyle) {
 					this.showBingoImage = true;
+					if (!this.pageMode) {
+						this.scrollChatDropdownToBottom();
+					}
 				}
 			}
 		},
@@ -771,6 +821,12 @@ const BINGO_OPENLIST = {
 			},
 			onBingoImageError() {
 				this.showBingoImage = false;
+			},
+			scrollChatDropdownToBottom() {
+				this.chatScrollIntoView = '';
+				this.$nextTick(() => {
+					this.chatScrollIntoView = 'bingo-chat-tail';
+				});
 			},
 			// 生成唯一key
 			generateKey(item, suffix = '') {
@@ -1160,25 +1216,19 @@ $white-color: #fff;
   }
 
   .bingo-image-scroll {
-    max-height: calc(100vh - 220px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
-  .bingo-openlist-image-wrap {
+  .bingo-image-scroll-chat {
     width: 100%;
-    overflow: hidden;
-    position: relative;
-    padding-bottom: 121.12%;
-    height: 0;
+    box-sizing: border-box;
+    flex-shrink: 0;
   }
 
-  .bingo-openlist-image {
-    position: absolute;
-    top: -5.04%;
-    left: 0;
+  .bingo-chat-tail-anchor {
     width: 100%;
-    display: block;
+    height: 1px;
   }
 
   .bingo-openlist-table-drawn {
@@ -1379,7 +1429,7 @@ $white-color: #fff;
 
 // 响应式适配
 @media screen and (max-width: 750rpx) {
-  .open-num-list:not(.bingo-group-page-mode) {
+  .open-num-list:not(.bingo-group-page-mode):not(.bingo-group-mode) {
     max-height: 450rpx;
   }
   
