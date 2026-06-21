@@ -468,7 +468,18 @@
             </view>
           </view>
         </view>
-        <open-num-list :isShow="isShowOpenList" class="oepnListHeight" :template="template" :list="openresultlist" :openListImageUrl="openListImageUrl" :historyStyle="roomConfig.openHistoryStyle || 0" :gid="gid"></open-num-list>
+        <open-num-list
+          :isShow="isShowOpenList"
+          class="oepnListHeight"
+          :template="template"
+          :list="openresultlist"
+          :openListImageUrl="openListImageUrl"
+          :historyStyle="roomConfig.openHistoryStyle || 0"
+          :gid="gid"
+          :historyLoading="openresultLoading"
+          :historyHasMore="bingoOpenResultHasMore"
+          @loadMoreHistory="onBingoChatLoadMoreHistory"
+        ></open-num-list>
       </u-transition>
       <u-popup :show="isShowSwitchPannel" mode="right" :closeOnClickOverlay="true" @close="isShowSwitchPannel = !isShowSwitchPannel" :safeAreaInsetTop="true">
         <view>
@@ -834,7 +845,12 @@ export default {
       periodtimer:null,
       openResult:[],//单期开奖结果
       template:'',
-      openresultlist:[],//开奖结果列表，最近50条
+      openresultlist:[],//开奖结果列表（今日，分页）
+      openresultPage: 1,
+      openresultPageSize: 50,
+      openresultTotal: 0,
+      openresultLoading: false,
+      openresultNoMore: false,
       cllist:[],//长龙数据
       predictInfoList:[],//预测结果列表
       isshowssckey:false,//是否显示时时彩前三中三等键盘键
@@ -1092,7 +1108,7 @@ export default {
     //预先初始化一次
     this.$u.api.common.longdragon({gid:this.gid}).then(res => {this.cllist = res.data;});
     this.$u.api.common.lotteryPredictInfo({gid:this.gid}).then(res => {this.predictInfoList = res.data;});
-    this.$u.api.common.resultByDate({gid:this.gid}).then(res => {this.openresultlist = res.data.records;});
+    this.fetchOpenResultList(1, false);
 
     //连接成功发送查询单期开奖结果
     if(!uni.$socketUtils.isOpenSocket){
@@ -1166,6 +1182,12 @@ export default {
         return `${this.openImageDomain}/upload/openimg/${dstr}/${this.gid}/openlist_${this.openResult.period}.webp`;
       }
       return '';
+    },
+    bingoOpenResultHasMore() {
+      if (!this.isBingoGroupOpenList()) {
+        return false;
+      }
+      return !this.openresultNoMore;
     }
   },
   watch: {
@@ -1813,9 +1835,9 @@ export default {
       this.safeExecute(() => {
         this.openResult = data.data;
         if(this.openresultlist.length > 0 && this.openresultlist[0].shortPeriod != this.openResult.period){
-          this.$u.api.common.resultByDate({gid:this.gid}).then(res => {this.openresultlist = res.data.records;});
+          this.fetchOpenResultList(1, false);
         }else if(this.openresultlist.length <= 0){
-          this.$u.api.common.resultByDate({gid:this.gid}).then(res => {this.openresultlist = res.data.records;});
+          this.fetchOpenResultList(1, false);
         }
       });
     },
@@ -3411,9 +3433,62 @@ export default {
       this.isclshow = false;
       this.isShowOpenList = !this.isShowOpenList;
       this.topPanelShow = this.isShowOpenList;
-      // if(this.isShowOpenList){
-      //   this.$u.api.common.resultByDate({gid:this.gid}).then(res => {this.openresultlist = res.data.records;});
-      // }
+    },
+    isBingoGroupOpenList() {
+      return this.template === 'BINGO' && (this.roomConfig.openHistoryStyle == 1 || this.roomConfig.openHistoryStyle === '1');
+    },
+    getBingoOpenResultRecords() {
+      return (this.openresultlist || []).filter(item => {
+        return item &&
+          (item.shortPeriod || item.period || item.id) &&
+          Array.isArray(item.openNum) &&
+          item.openNum.length > 0;
+      });
+    },
+    fetchOpenResultList(page = 1, append = false) {
+      if (!this.gid || this.openresultLoading) {
+        return Promise.resolve(false);
+      }
+      if (page > 1 && this.openresultNoMore) {
+        return Promise.resolve(false);
+      }
+      this.openresultLoading = true;
+      return this.$u.api.common.resultByDate({
+        gid: this.gid,
+        page,
+        pageSize: this.openresultPageSize
+      }).then(res => {
+        if (!res || !res.data) {
+          return false;
+        }
+        const records = Array.isArray(res.data.records) ? res.data.records : [];
+        const total = Number(res.data.total) || 0;
+        if (append) {
+          if (records.length === 0) {
+            this.openresultNoMore = true;
+            return true;
+          }
+          this.openresultlist = this.openresultlist.concat(records);
+        } else {
+          this.openresultlist = records;
+          this.openresultNoMore = false;
+        }
+        this.openresultPage = page;
+        this.openresultTotal = total;
+        this.openresultNoMore = records.length < this.openresultPageSize;
+        if (total > 0) {
+          this.openresultNoMore = this.getBingoOpenResultRecords().length >= total;
+        }
+        return true;
+      }).catch(() => false).finally(() => {
+        this.openresultLoading = false;
+      });
+    },
+    onBingoChatLoadMoreHistory() {
+      if (!this.isBingoGroupOpenList() || this.openresultLoading || this.openresultNoMore) {
+        return;
+      }
+      this.fetchOpenResultList(this.openresultPage + 1, true);
     },
     siteTo() {
       //#ifdef H5

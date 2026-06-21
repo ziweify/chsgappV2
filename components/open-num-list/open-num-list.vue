@@ -101,9 +101,15 @@
                 :style="bingoChatBodyScrollStyle"
                 :scroll-into-view="chatScrollIntoView"
                 :scroll-with-animation="false"
+                :upper-threshold="60"
+                @scrolltoupper="onChatScrollToUpper"
               >
                 <view class="bingo-chat-body-inner" :style="bingoChatBodyInnerStyle">
-                  <bingo-openlist-drawn-body part="body" :rows="bingoTableDisplayRows" />
+                  <view v-if="historyLoading" class="bingo-chat-load-tip">加载中...</view>
+                  <view v-else-if="!historyHasMore && bingoImageList.length > 1" class="bingo-chat-load-tip bingo-chat-load-tip-muted">今日已无更多</view>
+                  <view class="bingo-chat-rows-wrap" :style="bingoChatRowsWrapStyle">
+                    <bingo-openlist-drawn-body part="body" :rows="bingoTableDisplayRows" />
+                  </view>
                   <view id="bingo-chat-tail" class="bingo-chat-tail-anchor"></view>
                 </view>
               </scroll-view>
@@ -219,7 +225,9 @@ const BINGO_OPENLIST = {
 				BINGO_OPENLIST,
 				windowWidth: 375,
 				windowHeight: 667,
-				chatScrollIntoView: ''
+				chatScrollIntoView: '',
+				chatAllowLoadMore: false,
+				lastChatLoadEmitAt: 0
 			};
 		},
 		computed: {
@@ -247,7 +255,9 @@ const BINGO_OPENLIST = {
 				if (!Array.isArray(this.list)) {
 					return [];
 				}
-				const limit = this.pageMode ? this.maxItems : Math.min(this.maxItems, 50);
+				const limit = this.pageMode
+					? this.maxItems
+					: Math.min(this.list.length, 10000);
 				if (this.isBingoGroupStyle) {
 					return this.list.filter(item => {
 						return item &&
@@ -351,12 +361,22 @@ const BINGO_OPENLIST = {
 					width: '100%'
 				};
 			},
-			bingoChatBodyInnerStyle() {
+			bingoChatRowsWrapStyle() {
 				const { ROW_H } = BINGO_OPENLIST;
 				const w = this.windowWidth || 375;
 				const scale = w / BINGO_OPENLIST.BG_W;
 				const rowCount = this.bingoChatDisplayRowCount;
 				const h = Math.ceil(ROW_H * rowCount * scale);
+				return {
+					position: 'relative',
+					width: '100%',
+					height: h + 'px'
+				};
+			},
+			bingoChatBodyInnerStyle() {
+				const rowsH = parseInt(this.bingoChatRowsWrapStyle.height, 10) || 0;
+				const tipH = (this.historyLoading || (!this.historyHasMore && this.bingoImageList.length > 1)) ? 36 : 0;
+				const h = rowsH + tipH;
 				return {
 					position: 'relative',
 					width: '100%',
@@ -589,6 +609,14 @@ const BINGO_OPENLIST = {
 			gid: {
 				type: [Number, String],
 				default: ''
+			},
+			historyLoading: {
+				type: Boolean,
+				default: false
+			},
+			historyHasMore: {
+				type: Boolean,
+				default: true
 			}
 		},
 		methods: {
@@ -894,12 +922,30 @@ const BINGO_OPENLIST = {
 				this.showBingoImage = false;
 			},
 			scrollChatDropdownToBottom() {
+				this.chatAllowLoadMore = false;
 				this.chatScrollIntoView = '';
 				this.$nextTick(() => {
 					setTimeout(() => {
 						this.chatScrollIntoView = 'bingo-chat-tail';
+						setTimeout(() => {
+							this.chatAllowLoadMore = true;
+						}, 600);
 					}, 80);
 				});
+			},
+			onChatScrollToUpper() {
+				if (this.pageMode || !this.isBingoGroupStyle || !this.chatAllowLoadMore) {
+					return;
+				}
+				if (this.historyLoading || !this.historyHasMore) {
+					return;
+				}
+				const now = Date.now();
+				if (now - this.lastChatLoadEmitAt < 500) {
+					return;
+				}
+				this.lastChatLoadEmitAt = now;
+				this.$emit('loadMoreHistory');
 			},
 			// 生成唯一key
 			generateKey(item, suffix = '') {
@@ -1323,6 +1369,11 @@ $white-color: #fff;
     background: #fff;
   }
 
+  .bingo-chat-rows-wrap {
+    position: relative;
+    width: 100%;
+  }
+
   .bingo-image-scroll-chat {
     width: 100%;
     box-sizing: border-box;
@@ -1332,6 +1383,22 @@ $white-color: #fff;
   .bingo-chat-tail-anchor {
     width: 100%;
     height: 1px;
+  }
+
+  .bingo-chat-load-tip {
+    width: 100%;
+    text-align: center;
+    padding: 12rpx 0;
+    font-size: 24rpx;
+    color: #333;
+    background: #fffbe6;
+    position: relative;
+    z-index: 5;
+  }
+
+  .bingo-chat-load-tip-muted {
+    color: #999;
+    background: #f7f7f7;
   }
 
   .bingo-openlist-table-drawn {
