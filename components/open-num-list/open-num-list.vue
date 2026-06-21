@@ -118,6 +118,24 @@
                 </scroll-view>
               </view>
             </view>
+            <view class="bingo-chat-bottom-bar">
+              <view class="bingo-chat-bottom-row">
+                <text class="bingo-chat-visible-label">一屏显示</text>
+                <view class="bingo-chat-visible-options">
+                  <view
+                    v-for="n in chatVisibleRowOptions"
+                    :key="'vr-' + n"
+                    class="bingo-chat-visible-option"
+                    :class="{ active: bingoChatResolvedVisibleRows === n }"
+                    @click="setChatVisibleRows(n)"
+                  >{{ n }}</view>
+                </view>
+                <button class="bingo-chat-more-btn" @click="tokjresult">查看更多</button>
+              </view>
+              <text v-if="chatVisibleRowPref > bingoChatMaxVisibleRows" class="bingo-chat-visible-hint">
+                本机一屏最多 {{ bingoChatMaxVisibleRows }} 条，已自动调整
+              </text>
+            </view>
           </view>
           <view v-else class="bingo-image-scroll bingo-image-scroll-page">
             <view class="bingo-openlist-table bingo-openlist-table-drawn bingo-openlist-table-page" :style="bingoTableStyle">
@@ -150,7 +168,7 @@
         </view>
       </template>
     </view>
-    <view class="btns" v-if="!pageMode">
+    <view class="btns" v-if="!pageMode && !isBingoGroupStyle">
       <button @click="tokjresult">查看更多</button>
     </view>
   </view>
@@ -207,6 +225,12 @@ const BINGO_OPENLIST = {
 	ROW_COUNT: 31,
 	// 聊天下拉（群样式）显示行数
 	CHAT_DROPDOWN_ROW_COUNT: 23,
+	CHAT_VISIBLE_ROW_DEFAULT: 25,
+	CHAT_VISIBLE_ROW_MIN: 5,
+	CHAT_VISIBLE_ROW_PRESETS: [15, 20, 25, 30],
+	// 底部栏 rpx（与 .bingo-chat-bottom-bar / .bingo-chat-bottom-row 一致）
+	CHAT_BOTTOM_BAR_PADDING_Y_RPX: 20,
+	CHAT_BOTTOM_BAR_ROW_MIN_RPX: 56,
 	// 最新一期下方预留空白行（表示下一期位置）
 	CHAT_DROPDOWN_TAIL_EMPTY_ROWS: 1,
 	// GD2 imagettftext 的 size 是 point；CSS font-size 是 px（96DPI 下 point×96/72）
@@ -237,7 +261,8 @@ const BINGO_OPENLIST = {
 				chatRowCountBeforeLoad: 0,
 				chatScrollTopBeforeLoad: 0,
 				chatPendingScrollAdjust: false,
-				chatScrollLock: false
+				chatScrollLock: false,
+				chatVisibleRowPref: BINGO_OPENLIST.CHAT_VISIBLE_ROW_DEFAULT
 			};
 		},
 		computed: {
@@ -337,17 +362,79 @@ const BINGO_OPENLIST = {
 				const rowCount = this.bingoChatDisplayRowCount;
 				return (dataTop + ROW_H * rowCount) * scale;
 			},
-			bingoChatPanelHeightPx() {
+			bingoChatPanelMaxHeightPx() {
 				const sys = uni.getSystemInfoSync();
 				const windowH = sys.windowHeight || 667;
-				return Math.floor(windowH * 0.52);
+				const safeBottom = (sys.safeAreaInsets && sys.safeAreaInsets.bottom) || 0;
+				const topH = this.pageHeaderHeight > 0
+					? this.pageHeaderHeight
+					: Math.floor(windowH * 0.15);
+				const bottomH = this.pageBottomReserve > 0
+					? this.pageBottomReserve
+					: Math.ceil(120 * this.bingoChatRpxToPx);
+				const available = windowH - topH - bottomH - safeBottom;
+				const hardCap = Math.floor(windowH * 0.72);
+				return Math.max(Math.min(available, hardCap), 240);
+			},
+			bingoChatRowHeightExactPx() {
+				const w = this.windowWidth || 375;
+				return BINGO_OPENLIST.ROW_H * (w / BINGO_OPENLIST.BG_W);
+			},
+			bingoChatRpxToPx() {
+				const w = this.windowWidth || 375;
+				return w / 750;
+			},
+			bingoChatSettingsBarHeightPx() {
+				const scale = this.bingoChatRpxToPx;
+				return Math.ceil(
+					(BINGO_OPENLIST.CHAT_BOTTOM_BAR_PADDING_Y_RPX + BINGO_OPENLIST.CHAT_BOTTOM_BAR_ROW_MIN_RPX) * scale
+				);
+			},
+			bingoChatAvailableBodyHeightPx() {
+				const headerH = this.bingoDataBodyTopPx();
+				const settingsH = this.bingoChatSettingsBarHeightPx;
+				const available = this.bingoChatPanelMaxHeightPx - headerH - settingsH;
+				return Math.max(available, this.bingoChatRowHeightPx());
+			},
+			bingoChatMaxVisibleRows() {
+				const rowHPx = this.bingoChatRowHeightExactPx;
+				if (rowHPx <= 0) {
+					return BINGO_OPENLIST.CHAT_VISIBLE_ROW_DEFAULT;
+				}
+				return Math.max(
+					Math.floor(this.bingoChatAvailableBodyHeightPx / rowHPx),
+					BINGO_OPENLIST.CHAT_VISIBLE_ROW_MIN
+				);
+			},
+			bingoChatResolvedVisibleRows() {
+				const pref = parseInt(this.chatVisibleRowPref, 10) || BINGO_OPENLIST.CHAT_VISIBLE_ROW_DEFAULT;
+				return Math.min(
+					Math.max(pref, BINGO_OPENLIST.CHAT_VISIBLE_ROW_MIN),
+					this.bingoChatMaxVisibleRows
+				);
+			},
+			chatVisibleRowOptions() {
+				return BINGO_OPENLIST.CHAT_VISIBLE_ROW_PRESETS;
+			},
+			bingoChatPanelHeightPx() {
+				const headerH = this.bingoDataBodyTopPx();
+				const settingsH = this.bingoChatSettingsBarHeightPx;
+				const rowHPx = this.bingoChatRowHeightPx();
+				const preferredBodyH = this.bingoChatResolvedVisibleRows * rowHPx;
+				const bodyH = Math.min(preferredBodyH, this.bingoChatAvailableBodyHeightPx);
+				return Math.min(
+					Math.ceil(headerH + bodyH + settingsH),
+					this.bingoChatPanelMaxHeightPx
+				);
 			},
 			bingoChatPanelStyle() {
 				const h = this.bingoChatPanelHeightPx;
 				return {
 					height: h + 'px',
-					maxHeight: h + 'px',
-					overflow: 'hidden'
+					maxHeight: this.bingoChatPanelMaxHeightPx + 'px',
+					overflow: 'hidden',
+					display: 'flex',
+					flexDirection: 'column'
 				};
 			},
 			bingoChatHeaderShellStyle() {
@@ -363,11 +450,11 @@ const BINGO_OPENLIST = {
 				};
 			},
 			bingoChatBodyScrollStyle() {
-				const panelH = this.bingoChatPanelHeightPx;
-				const headerH = this.bingoDataBodyTopPx();
-				const bodyH = Math.max(panelH - headerH, 80);
+				const rowHPx = this.bingoChatRowHeightPx();
+				const preferredH = this.bingoChatResolvedVisibleRows * rowHPx;
+				const bodyH = Math.min(preferredH, this.bingoChatAvailableBodyHeightPx);
 				return {
-					height: bodyH + 'px',
+					height: Math.max(Math.ceil(bodyH), 80) + 'px',
 					width: '100%'
 				};
 			},
@@ -506,6 +593,7 @@ const BINGO_OPENLIST = {
 		},
 		created() {
 			this.updateWindowSize();
+			this.loadChatVisibleRowPref();
 		},
 		watch: {
 			list: {
@@ -528,14 +616,15 @@ const BINGO_OPENLIST = {
 				this.showBingoImage = true;
 			},
 			pageHeaderHeight() {
-				if (this.pageMode) {
-					this.updateWindowSize();
-				}
+				this.updateWindowSize();
 			},
 			pageBodyHeight() {
 				if (this.pageMode) {
 					this.updateWindowSize();
 				}
+			},
+			pageBottomReserve() {
+				this.updateWindowSize();
 			},
 			isShow(val) {
 				if (val && this.isBingoGroupStyle) {
@@ -606,6 +695,11 @@ const BINGO_OPENLIST = {
 			},
 			// 查看更多页内容区高度（header 以下整页，px）
 			pageBodyHeight: {
+				type: Number,
+				default: 0
+			},
+			// 聊天下拉：底部聊天输入区占用高度（px），用于计算一屏可显示行数
+			pageBottomReserve: {
 				type: Number,
 				default: 0
 			},
@@ -1002,6 +1096,40 @@ const BINGO_OPENLIST = {
 				this.chatScrollTopBeforeLoad = this.chatBodyScrollTop;
 				this.chatPendingScrollAdjust = true;
 				this.$emit('loadMoreHistory');
+			},
+			loadChatVisibleRowPref() {
+				try {
+					const saved = parseInt(uni.getStorageSync('bingoChatDropdownVisibleRows'), 10);
+					const presets = BINGO_OPENLIST.CHAT_VISIBLE_ROW_PRESETS;
+					if (!Number.isNaN(saved) && presets.indexOf(saved) !== -1) {
+						this.chatVisibleRowPref = saved;
+					}
+				} catch (e) {
+					// ignore
+				}
+			},
+			setChatVisibleRows(count) {
+				const pref = parseInt(count, 10);
+				if (Number.isNaN(pref)) {
+					return;
+				}
+				this.chatVisibleRowPref = pref;
+				try {
+					uni.setStorageSync('bingoChatDropdownVisibleRows', pref);
+				} catch (e) {
+					// ignore
+				}
+				if (pref > this.bingoChatMaxVisibleRows) {
+					uni.showToast({
+						title: `本机一屏最多 ${this.bingoChatMaxVisibleRows} 条`,
+						icon: 'none'
+					});
+				}
+				if (this.isShow && this.isBingoGroupStyle && !this.pageMode) {
+					this.$nextTick(() => {
+						this.scrollChatDropdownToBottom();
+					});
+				}
 			},
 			// 生成唯一key
 			generateKey(item, suffix = '') {
@@ -1404,8 +1532,89 @@ $white-color: #fff;
   .bingo-openlist-table-chat {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
+  }
+
+  .bingo-chat-bottom-bar {
+    flex-shrink: 0;
+    padding: 10rpx 16rpx;
+    border-top: 1px solid #e8e8e8;
+    background: #fafafa;
+    box-sizing: border-box;
+  }
+
+  .bingo-chat-bottom-row {
+    display: flex;
+    align-items: center;
+    gap: 10rpx;
+    width: 100%;
+    min-height: 56rpx;
+  }
+
+  .bingo-chat-visible-label {
+    flex-shrink: 0;
+    font-size: 22rpx;
+    color: #333;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .bingo-chat-visible-options {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8rpx;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .bingo-chat-visible-option {
+    flex-shrink: 0;
+    min-width: 52rpx;
+    padding: 6rpx 14rpx;
+    text-align: center;
+    font-size: 22rpx;
+    color: #333;
+    background: #fff;
+    border: 1px solid #d9d9d9;
+    border-radius: 8rpx;
+    box-sizing: border-box;
+    line-height: 1.2;
+  }
+
+  .bingo-chat-visible-option.active {
+    color: #fff;
+    background: #298aff;
+    border-color: #298aff;
+  }
+
+  .bingo-chat-more-btn {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0 20rpx;
+    height: 52rpx;
+    line-height: 52rpx;
+    font-size: 22rpx;
+    color: #fff;
+    background: #298aff;
+    border: none;
+    border-radius: 8rpx;
+    white-space: nowrap;
+  }
+
+  .bingo-chat-more-btn::after {
+    border: none;
+  }
+
+  .bingo-chat-visible-hint {
+    display: block;
+    margin-top: 8rpx;
+    font-size: 20rpx;
+    color: #999;
+    line-height: 1.3;
   }
 
   .bingo-chat-header-fixed {

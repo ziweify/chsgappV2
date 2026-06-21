@@ -476,6 +476,8 @@
           :openListImageUrl="openListImageUrl"
           :historyStyle="roomConfig.openHistoryStyle || 0"
           :gid="gid"
+          :pageHeaderHeight="heightArr.topHeight"
+          :pageBottomReserve="heightArr.betBottomHeight"
           :historyLoading="openresultLoading"
           :historyHasMore="bingoOpenResultHasMore"
           @loadMoreHistory="onBingoChatLoadMoreHistory"
