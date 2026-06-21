@@ -95,24 +95,28 @@
               <view class="bingo-chat-header-fixed" :style="bingoChatHeaderShellStyle">
                 <bingo-openlist-drawn-body part="header" :rows="[]" />
               </view>
-              <scroll-view
-                scroll-y
-                class="bingo-chat-body-scroll"
-                :style="bingoChatBodyScrollStyle"
-                :scroll-into-view="chatScrollIntoView"
-                :scroll-with-animation="false"
-                :upper-threshold="60"
-                @scrolltoupper="onChatScrollToUpper"
-              >
-                <view class="bingo-chat-body-inner" :style="bingoChatBodyInnerStyle">
-                  <view v-if="historyLoading" class="bingo-chat-load-tip">加载中...</view>
-                  <view v-else-if="!historyHasMore && bingoImageList.length > 1" class="bingo-chat-load-tip bingo-chat-load-tip-muted">今日已无更多</view>
-                  <view class="bingo-chat-rows-wrap" :style="bingoChatRowsWrapStyle">
-                    <bingo-openlist-drawn-body part="body" :rows="bingoTableDisplayRows" />
+              <view class="bingo-chat-body-shell" :style="bingoChatBodyScrollStyle">
+                <view v-if="historyLoading" class="bingo-chat-load-tip bingo-chat-load-tip-overlay">加载中...</view>
+                <scroll-view
+                  scroll-y
+                  class="bingo-chat-body-scroll"
+                  :style="bingoChatBodyScrollStyle"
+                  :scroll-top="chatScrollTop"
+                  :scroll-into-view="chatScrollIntoView"
+                  :scroll-with-animation="false"
+                  :upper-threshold="60"
+                  @scroll="onChatBodyScroll"
+                  @scrolltoupper="onChatScrollToUpper"
+                >
+                  <view class="bingo-chat-body-inner" :style="bingoChatBodyInnerStyle">
+                    <view v-if="!historyLoading && !historyHasMore && bingoImageList.length > 1" class="bingo-chat-load-tip bingo-chat-load-tip-muted">今日已无更多</view>
+                    <view class="bingo-chat-rows-wrap" :style="bingoChatRowsWrapStyle">
+                      <bingo-openlist-drawn-body part="body" :rows="bingoTableDisplayRows" />
+                    </view>
+                    <view id="bingo-chat-tail" class="bingo-chat-tail-anchor"></view>
                   </view>
-                  <view id="bingo-chat-tail" class="bingo-chat-tail-anchor"></view>
-                </view>
-              </scroll-view>
+                </scroll-view>
+              </view>
             </view>
           </view>
           <view v-else class="bingo-image-scroll bingo-image-scroll-page">
@@ -226,8 +230,14 @@ const BINGO_OPENLIST = {
 				windowWidth: 375,
 				windowHeight: 667,
 				chatScrollIntoView: '',
+				chatScrollTop: 0,
+				chatBodyScrollTop: 0,
 				chatAllowLoadMore: false,
-				lastChatLoadEmitAt: 0
+				lastChatLoadEmitAt: 0,
+				chatRowCountBeforeLoad: 0,
+				chatScrollTopBeforeLoad: 0,
+				chatPendingScrollAdjust: false,
+				chatScrollLock: false
 			};
 		},
 		computed: {
@@ -375,7 +385,7 @@ const BINGO_OPENLIST = {
 			},
 			bingoChatBodyInnerStyle() {
 				const rowsH = parseInt(this.bingoChatRowsWrapStyle.height, 10) || 0;
-				const tipH = (this.historyLoading || (!this.historyHasMore && this.bingoImageList.length > 1)) ? 36 : 0;
+				const tipH = (!this.historyHasMore && this.bingoImageList.length > 1) ? 36 : 0;
 				const h = rowsH + tipH;
 				return {
 					position: 'relative',
@@ -533,6 +543,15 @@ const BINGO_OPENLIST = {
 					if (!this.pageMode) {
 						this.scrollChatDropdownToBottom();
 					}
+				}
+			},
+			historyLoading(val, oldVal) {
+				if (oldVal === true && val === false && this.chatPendingScrollAdjust) {
+					this.$nextTick(() => {
+						setTimeout(() => {
+							this.restoreScrollAfterPrepend();
+						}, 50);
+					});
 				}
 			}
 		},
@@ -923,6 +942,7 @@ const BINGO_OPENLIST = {
 			},
 			scrollChatDropdownToBottom() {
 				this.chatAllowLoadMore = false;
+				this.chatPendingScrollAdjust = false;
 				this.chatScrollIntoView = '';
 				this.$nextTick(() => {
 					setTimeout(() => {
@@ -932,6 +952,39 @@ const BINGO_OPENLIST = {
 						}, 600);
 					}, 80);
 				});
+			},
+			bingoChatRowHeightPx() {
+				const w = this.windowWidth || 375;
+				return Math.ceil(BINGO_OPENLIST.ROW_H * (w / BINGO_OPENLIST.BG_W));
+			},
+			onChatBodyScroll(e) {
+				if (this.chatScrollLock) {
+					return;
+				}
+				this.chatBodyScrollTop = (e.detail && e.detail.scrollTop) || 0;
+			},
+			applyChatScrollTop(top) {
+				const value = Math.max(Math.round(top), 0);
+				this.chatScrollLock = true;
+				this.chatScrollIntoView = '';
+				this.chatScrollTop = value > 0 ? value + 0.01 : 0.01;
+				this.$nextTick(() => {
+					this.chatScrollTop = value;
+					this.chatBodyScrollTop = value;
+					setTimeout(() => {
+						this.chatScrollLock = false;
+					}, 80);
+				});
+			},
+			restoreScrollAfterPrepend() {
+				const added = this.bingoImageList.length - this.chatRowCountBeforeLoad;
+				if (added <= 0) {
+					this.chatPendingScrollAdjust = false;
+					return;
+				}
+				const target = this.chatScrollTopBeforeLoad + added * this.bingoChatRowHeightPx();
+				this.applyChatScrollTop(target);
+				this.chatPendingScrollAdjust = false;
 			},
 			onChatScrollToUpper() {
 				if (this.pageMode || !this.isBingoGroupStyle || !this.chatAllowLoadMore) {
@@ -945,6 +998,9 @@ const BINGO_OPENLIST = {
 					return;
 				}
 				this.lastChatLoadEmitAt = now;
+				this.chatRowCountBeforeLoad = this.bingoImageList.length;
+				this.chatScrollTopBeforeLoad = this.chatBodyScrollTop;
+				this.chatPendingScrollAdjust = true;
 				this.$emit('loadMoreHistory');
 			},
 			// 生成唯一key
@@ -1357,6 +1413,11 @@ $white-color: #fff;
     background: #fff;
   }
 
+  .bingo-chat-body-shell {
+    position: relative;
+    width: 100%;
+  }
+
   .bingo-chat-body-scroll {
     width: 100%;
     box-sizing: border-box;
@@ -1399,6 +1460,15 @@ $white-color: #fff;
   .bingo-chat-load-tip-muted {
     color: #999;
     background: #f7f7f7;
+  }
+
+  .bingo-chat-load-tip-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 6;
+    pointer-events: none;
   }
 
   .bingo-openlist-table-drawn {
